@@ -62,6 +62,7 @@ export interface DebtRecord {
   notes?: string;             // Заметки
   debtorPhotoUrl?: string;    // Фото должника (URL или base64)
   payments: DebtPayment[];    // История выплат
+  saleId?: string;            // Ссылка на соответствующую запись продажи
 }
 
 export interface SaleItemRecord {
@@ -90,4 +91,7 @@ export interface SaleRecord {
   isDebt: boolean;            // В долг или за наличные
   debtorName?: string;        // Покупатель при продаже в долг
   initialPayment?: number;    // Первый взнос
+  debtId?: string;            // Ссылка на запись долга
+  debtStatus?: 'active' | 'partial' | 'paid'; // Текущий статус выплаты долга
+  paidAmountOnDebt?: number;  // Сколько было выплачено по долгу
 }

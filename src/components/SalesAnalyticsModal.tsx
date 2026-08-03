@@ -23,12 +23,13 @@ import {
   User,
   Package
 } from 'lucide-react';
-import { SaleRecord, ShipmentBatch } from '../types';
+import { SaleRecord, DebtRecord, ShipmentBatch } from '../types';
 
 interface SalesAnalyticsModalProps {
   isOpen: boolean;
   onClose: () => void;
   sales: SaleRecord[];
+  debts?: DebtRecord[];
   currencySymbol: string;
   targetCurrency: 'USD' | 'KGS';
   onDeleteSale?: (saleId: string) => void;
@@ -87,6 +88,7 @@ export default function SalesAnalyticsModal({
   isOpen,
   onClose,
   sales = [],
+  debts = [],
   currencySymbol = 'сом',
   targetCurrency = 'KGS',
   onDeleteSale,
@@ -113,6 +115,45 @@ export default function SalesAnalyticsModal({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'cash' | 'debt'>('all');
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+
+  const debtsList = useMemo(() => Array.isArray(debts) ? debts : [], [debts]);
+
+  // Dynamic helper to resolve live debt status of a sale against debts array
+  const getSaleDebtInfo = (sale: SaleRecord) => {
+    if (!sale) return { isActiveDebt: false, isPaidOff: false, debtorName: undefined };
+
+    // Try finding matching debt record
+    const matchingDebt = debtsList.find(d => 
+      (sale.debtId && d.id === sale.debtId) ||
+      (d.saleId && d.saleId === sale.id) ||
+      (d.debtorName && sale.debtorName && d.debtorName.trim().toLowerCase() === sale.debtorName.trim().toLowerCase() && Math.abs(d.totalAmount - sale.totalRevenue) < 1)
+    );
+
+    if (matchingDebt) {
+      const isPaidOff = matchingDebt.status === 'paid' || matchingDebt.paidAmount >= matchingDebt.totalAmount;
+      return {
+        isActiveDebt: !isPaidOff,
+        isPaidOff,
+        debtorName: matchingDebt.debtorName || sale.debtorName,
+        paidAmount: matchingDebt.paidAmount,
+        totalAmount: matchingDebt.totalAmount
+      };
+    }
+
+    if (sale.debtStatus === 'paid' || (!sale.isDebt && sale.debtorName)) {
+      return {
+        isActiveDebt: false,
+        isPaidOff: true,
+        debtorName: sale.debtorName
+      };
+    }
+
+    return {
+      isActiveDebt: Boolean(sale.isDebt),
+      isPaidOff: !sale.isDebt,
+      debtorName: sale.debtorName
+    };
+  };
 
   // Helper date utility strings
   const getTodayStr = () => safeGetDateStr(new Date());
@@ -163,9 +204,10 @@ export default function SalesAnalyticsModal({
         if (customEndDate && saleDateStr > customEndDate) return false;
       }
 
-      // Payment filter
-      if (paymentFilter === 'cash' && s.isDebt) return false;
-      if (paymentFilter === 'debt' && !s.isDebt) return false;
+      // Payment filter using dynamic debt status
+      const debtInfo = getSaleDebtInfo(s);
+      if (paymentFilter === 'cash' && debtInfo.isActiveDebt) return false;
+      if (paymentFilter === 'debt' && !debtInfo.isActiveDebt) return false;
 
       // Search term
       if (searchTerm.trim()) {
@@ -178,7 +220,7 @@ export default function SalesAnalyticsModal({
 
       return true;
     });
-  }, [sales, period, customStartDate, customEndDate, paymentFilter, searchTerm]);
+  }, [sales, debtsList, period, customStartDate, customEndDate, paymentFilter, searchTerm]);
 
   // Aggregate stats calculation
   const stats = useMemo(() => {
@@ -190,11 +232,12 @@ export default function SalesAnalyticsModal({
     let debtRevenue = 0;
 
     filteredSalesByPeriod.forEach(s => {
+      const debtInfo = getSaleDebtInfo(s);
       totalRevenue += s.totalRevenue || 0;
       totalCogs += s.totalCogs || 0;
       netProfit += s.netProfit || 0;
 
-      if (s.isDebt) {
+      if (debtInfo.isActiveDebt) {
         debtRevenue += s.totalRevenue || 0;
       } else {
         cashRevenue += s.totalRevenue || 0;
@@ -219,7 +262,7 @@ export default function SalesAnalyticsModal({
       debtRevenue,
       profitMarginPercent
     };
-  }, [filteredSalesByPeriod]);
+  }, [filteredSalesByPeriod, debtsList]);
 
   // Generate Daily Chart Data according to selected period
   const dailyChartData = useMemo(() => {
@@ -698,6 +741,7 @@ export default function SalesAnalyticsModal({
               ) : (
                 filteredSalesByPeriod.map((sale) => {
                   const isExpanded = expandedSaleId === sale.id;
+                  const debtInfo = getSaleDebtInfo(sale);
 
                   return (
                     <div
@@ -711,7 +755,9 @@ export default function SalesAnalyticsModal({
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                            sale.isDebt ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            debtInfo.isActiveDebt 
+                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' 
+                              : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                           }`}>
                             <Receipt className="w-4 h-4" />
                           </div>
@@ -723,12 +769,18 @@ export default function SalesAnalyticsModal({
                                   ? sale.items.map(i => `${i.productName} (${i.quantity} шт)`).join(', ')
                                   : 'Продажа товаров'}
                               </span>
-                              {sale.isDebt ? (
-                                <span className="px-2 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] rounded-full font-bold">
-                                  В долг: {sale.debtorName || 'Покупатель'}
+                              {debtInfo.isActiveDebt ? (
+                                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] rounded-full font-bold flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />
+                                  <span>В долг: {debtInfo.debtorName || 'Покупатель'}</span>
+                                </span>
+                              ) : debtInfo.isPaidOff && debtInfo.debtorName ? (
+                                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] rounded-full font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                  <span>Долг погашен ({debtInfo.debtorName})</span>
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] rounded-full font-bold">
+                                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] rounded-full font-bold">
                                   Наличные
                                 </span>
                               )}

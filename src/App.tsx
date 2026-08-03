@@ -375,6 +375,39 @@ export default function App() {
   const loadAllBatches = loadAllData;
 
   // --- DEBT HANDLERS ---
+  const syncSaleForDebt = (debt: DebtRecord) => {
+    setSales(prevSales => {
+      let changed = false;
+      const updatedSales = prevSales.map(s => {
+        const isMatch = 
+          (debt.saleId && s.id === debt.saleId) ||
+          (s.debtId && s.debtId === debt.id) ||
+          (s.debtorName && debt.debtorName && s.debtorName.trim().toLowerCase() === debt.debtorName.trim().toLowerCase() && Math.abs((s.totalRevenue || 0) - debt.totalAmount) < 1);
+
+        if (isMatch) {
+          changed = true;
+          const isFullyPaid = debt.status === 'paid' || debt.paidAmount >= debt.totalAmount;
+          const updatedSale: SaleRecord = {
+            ...s,
+            debtId: debt.id,
+            debtStatus: debt.status,
+            paidAmountOnDebt: debt.paidAmount,
+            // If fully paid off, isDebt becomes false so it moves out of active debts
+            isDebt: !isFullyPaid
+          };
+          saveSaleToCloud(updatedSale).catch(err => console.warn('Cloud sync error for sale:', err));
+          return updatedSale;
+        }
+        return s;
+      });
+
+      if (changed) {
+        saveLocal('sinocalc_sales_local', updatedSales);
+      }
+      return updatedSales;
+    });
+  };
+
   const handleAddDebt = async (
     newDebtData: Omit<DebtRecord, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'payments'>,
     initialPayment = 0
@@ -406,6 +439,10 @@ export default function App() {
     const updated = [newDebt, ...debts];
     setDebts(updated);
     saveLocal('sinocalc_debts_local', updated);
+
+    // Synchronize sales
+    syncSaleForDebt(newDebt);
+
     try {
       setSyncStatus('saving');
       await saveDebtToCloud(newDebt);
@@ -414,12 +451,18 @@ export default function App() {
       console.error('Failed to save debt to cloud:', err);
       setSyncStatus('error');
     }
+
+    return newDebt;
   };
 
   const handleUpdateDebt = async (updatedDebt: DebtRecord) => {
     const updated = debts.map(d => d.id === updatedDebt.id ? updatedDebt : d);
     setDebts(updated);
     saveLocal('sinocalc_debts_local', updated);
+
+    // Synchronize sales
+    syncSaleForDebt(updatedDebt);
+
     try {
       setSyncStatus('saving');
       await saveDebtToCloud(updatedDebt);
@@ -482,6 +525,10 @@ export default function App() {
 
     const updatedList = debts.map(d => d.id === debtId ? updatedDebt : d);
     setDebts(updatedList);
+    saveLocal('sinocalc_debts_local', updatedList);
+
+    // Synchronize sales
+    syncSaleForDebt(updatedDebt);
 
     try {
       setSyncStatus('saving');
@@ -3239,6 +3286,7 @@ export default function App() {
         isOpen={showSalesAnalyticsModal}
         onClose={() => setShowSalesAnalyticsModal(false)}
         sales={sales || []}
+        debts={debts || []}
         currencySymbol={calculations?.currencySymbol || (activeBatch?.targetCurrency === 'USD' ? '$' : 'сом')}
         targetCurrency={activeBatch?.targetCurrency || 'KGS'}
         onDeleteSale={handleDeleteSale}
