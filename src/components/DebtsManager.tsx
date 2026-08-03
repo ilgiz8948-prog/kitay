@@ -21,9 +21,13 @@ import {
   FileText,
   Camera,
   Image as ImageIcon,
-  Upload
+  Upload,
+  Receipt,
+  Send,
+  Share2
 } from 'lucide-react';
 import { DebtRecord, DebtPayment } from '../types';
+import DebtReceiptModal from './DebtReceiptModal';
 
 interface DebtsManagerProps {
   debts: DebtRecord[];
@@ -55,6 +59,7 @@ export default function DebtsManager({
   const [showAddModal, setShowAddModal] = useState(false);
   const [repayingDebt, setRepayingDebt] = useState<DebtRecord | null>(null);
   const [editingDebt, setEditingDebt] = useState<DebtRecord | null>(null);
+  const [receiptDebt, setReceiptDebt] = useState<DebtRecord | null>(null);
   const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
@@ -602,7 +607,16 @@ export default function DebtsManager({
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        onClick={() => setReceiptDebt(debt)}
+                        className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                        title="Сформировать чек долга и отправить клиенту в WhatsApp"
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                        <span>ЧЕК ДОЛГА</span>
+                      </button>
+
                       {remaining > 0 && (
                         <button
                           onClick={() => setRepayingDebt(debt)}
@@ -1106,6 +1120,14 @@ export default function DebtsManager({
           </div>
         </div>
       )}
+
+      {/* --- DEBT RECEIPT MODAL --- */}
+      <DebtReceiptModal
+        isOpen={!!receiptDebt}
+        onClose={() => setReceiptDebt(null)}
+        debt={receiptDebt}
+        currencySymbol={defaultCurrency === 'USD' ? '$' : 'сом'}
+      />
 
     </div>
   );

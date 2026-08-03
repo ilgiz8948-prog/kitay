@@ -29,6 +29,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { SaleRecord, DebtRecord, ShipmentBatch } from '../types';
+import DebtReceiptModal from './DebtReceiptModal';
 
 interface SalesAnalyticsModalProps {
   isOpen: boolean;
@@ -127,6 +128,7 @@ export default function SalesAnalyticsModal({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'cash' | 'debt'>('all');
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+  const [selectedDebtForReceipt, setSelectedDebtForReceipt] = useState<DebtRecord | null>(null);
 
   const debtsList = useMemo(() => Array.isArray(debts) ? debts : [], [debts]);
 
@@ -1799,6 +1801,16 @@ export default function SalesAnalyticsModal({
                                 <span className="text-emerald-400 font-bold">+{debt.paidAmount.toLocaleString('ru-RU')} {currencySymbol}</span>
                               </div>
                             </div>
+
+                            <div className="pt-2 border-t border-slate-800/80 flex justify-end">
+                              <button
+                                onClick={() => setSelectedDebtForReceipt(debt)}
+                                className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+                              >
+                                <Receipt className="w-3.5 h-3.5" />
+                                <span>ЧЕК ДОЛГА</span>
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -1922,6 +1934,14 @@ export default function SalesAnalyticsModal({
             Закрыть
           </button>
         </div>
+
+        {/* DEBT RECEIPT MODAL */}
+        <DebtReceiptModal
+          isOpen={!!selectedDebtForReceipt}
+          onClose={() => setSelectedDebtForReceipt(null)}
+          debt={selectedDebtForReceipt}
+          currencySymbol={currencySymbol}
+        />
 
       </div>
     </div>
