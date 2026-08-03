@@ -24,7 +24,9 @@ import {
   Package,
   History,
   PieChart,
-  ArrowDownRight
+  ArrowDownRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { SaleRecord, DebtRecord, ShipmentBatch } from '../types';
 
@@ -41,6 +43,7 @@ interface SalesAnalyticsModalProps {
 
 type PeriodFilter = 'today' | 'yesterday' | '7days' | '30days' | 'all' | 'custom';
 type AnalyticsTab = 'sales' | 'debts';
+type DebtSubTab = 'products' | 'debtors' | 'repayments';
 
 // Safe date helpers to prevent RangeError / invalid date crashes
 const safeGetDateStr = (dateVal: any): string => {
@@ -99,6 +102,8 @@ export default function SalesAnalyticsModal({
   onOpenReceipt
 }: SalesAnalyticsModalProps) {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('sales');
+  const [debtSubTab, setDebtSubTab] = useState<DebtSubTab>('products');
+  const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [period, setPeriod] = useState<PeriodFilter>('7days');
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
     try {
@@ -298,6 +303,261 @@ export default function SalesAnalyticsModal({
       repaymentPercentage
     };
   }, [filteredRepaymentsByPeriod, debtsList]);
+
+  // Aggregated Debt Products List (Goods Sold on Credit)
+  const debtProductsSummary = useMemo(() => {
+    const todayStr = getTodayStr();
+    const yesterdayStr = getYesterdayStr();
+    const now = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 29);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const isInPeriod = (dateVal: string | undefined) => {
+      if (!dateVal) return true;
+      const dStr = safeGetDateStr(dateVal);
+      let dObj: Date;
+      try {
+        dObj = new Date(dateVal);
+        if (isNaN(dObj.getTime())) dObj = new Date(dStr);
+      } catch {
+        dObj = new Date();
+      }
+
+      if (period === 'today') return dStr === todayStr;
+      if (period === 'yesterday') return dStr === yesterdayStr;
+      if (period === '7days') return dObj >= sevenDaysAgo;
+      if (period === '30days') return dObj >= thirtyDaysAgo;
+      if (period === 'custom') {
+        if (customStartDate && dStr < customStartDate) return false;
+        if (customEndDate && dStr > customEndDate) return false;
+        return true;
+      }
+      return true;
+    };
+
+    const map = new Map<string, {
+      productName: string;
+      totalQty: number;
+      totalDebtAmount: number;
+      totalPaidAmount: number;
+      remainingDebtAmount: number;
+      debtorsMap: Map<string, {
+        debtorName: string;
+        qty: number;
+        amount: number;
+        paid: number;
+        remaining: number;
+        status: 'active' | 'partial' | 'paid';
+        date: string;
+        phone?: string;
+      }>;
+    }>();
+
+    const salesList = Array.isArray(sales) ? sales : [];
+    const processedDebtIds = new Set<string>();
+
+    debtsList.forEach(debt => {
+      if (!debt) return;
+      if (!isInPeriod(debt.createdAt)) return;
+
+      processedDebtIds.add(debt.id);
+
+      // Try to find matching sale in salesList
+      const linkedSale = salesList.find(s => s.debtId === debt.id || (debt.saleId && s.id === debt.saleId));
+
+      const totalDebt = debt.totalAmount || 0;
+      const paidDebt = debt.paidAmount || 0;
+      const remainingDebt = Math.max(0, totalDebt - paidDebt);
+      const paidRatio = totalDebt > 0 ? (paidDebt / totalDebt) : 0;
+
+      if (linkedSale && linkedSale.items && linkedSale.items.length > 0) {
+        linkedSale.items.forEach(item => {
+          const pName = item.productName || 'Товар без названия';
+          const itemTotal = item.totalAmount || 0;
+          const itemPaid = Math.round(itemTotal * paidRatio);
+          const itemRemaining = Math.max(0, itemTotal - itemPaid);
+          const itemQty = item.quantity || 1;
+
+          if (!map.has(pName)) {
+            map.set(pName, {
+              productName: pName,
+              totalQty: 0,
+              totalDebtAmount: 0,
+              totalPaidAmount: 0,
+              remainingDebtAmount: 0,
+              debtorsMap: new Map()
+            });
+          }
+
+          const entry = map.get(pName)!;
+          entry.totalQty += itemQty;
+          entry.totalDebtAmount += itemTotal;
+          entry.totalPaidAmount += itemPaid;
+          entry.remainingDebtAmount += itemRemaining;
+
+          const dKey = `${debt.debtorName}_${debt.id}`;
+          if (!entry.debtorsMap.has(dKey)) {
+            entry.debtorsMap.set(dKey, {
+              debtorName: debt.debtorName || 'Покупатель',
+              qty: 0,
+              amount: 0,
+              paid: 0,
+              remaining: 0,
+              status: debt.status,
+              date: debt.createdAt,
+              phone: debt.phone
+            });
+          }
+          const debtorEntry = entry.debtorsMap.get(dKey)!;
+          debtorEntry.qty += itemQty;
+          debtorEntry.amount += itemTotal;
+          debtorEntry.paid += itemPaid;
+          debtorEntry.remaining += itemRemaining;
+        });
+      } else {
+        const pName = debt.productName || 'Товар в долг';
+        const itemQty = debt.quantity || 1;
+
+        if (!map.has(pName)) {
+          map.set(pName, {
+            productName: pName,
+            totalQty: 0,
+            totalDebtAmount: 0,
+            totalPaidAmount: 0,
+            remainingDebtAmount: 0,
+            debtorsMap: new Map()
+          });
+        }
+
+        const entry = map.get(pName)!;
+        entry.totalQty += itemQty;
+        entry.totalDebtAmount += totalDebt;
+        entry.totalPaidAmount += paidDebt;
+        entry.remainingDebtAmount += remainingDebt;
+
+        const dKey = `${debt.debtorName}_${debt.id}`;
+        if (!entry.debtorsMap.has(dKey)) {
+          entry.debtorsMap.set(dKey, {
+            debtorName: debt.debtorName || 'Покупатель',
+            qty: 0,
+            amount: 0,
+            paid: 0,
+            remaining: 0,
+            status: debt.status,
+            date: debt.createdAt,
+            phone: debt.phone
+          });
+        }
+        const debtorEntry = entry.debtorsMap.get(dKey)!;
+        debtorEntry.qty += itemQty;
+        debtorEntry.amount += totalDebt;
+        debtorEntry.paid += paidDebt;
+        debtorEntry.remaining += remainingDebt;
+      }
+    });
+
+    // Also process sales marked as debt that were not caught
+    salesList.forEach(s => {
+      if (!s || !s.isDebt) return;
+      if (s.debtId && processedDebtIds.has(s.debtId)) return;
+      if (!isInPeriod(s.timestamp || s.dateStr)) return;
+
+      const totalRev = s.totalRevenue || 0;
+      const paidAmt = s.paidAmountOnDebt || s.initialPayment || 0;
+      const remainingAmt = Math.max(0, totalRev - paidAmt);
+      const paidRatio = totalRev > 0 ? (paidAmt / totalRev) : 0;
+      const debtStatus = s.debtStatus || (remainingAmt === 0 ? 'paid' : (paidAmt > 0 ? 'partial' : 'active'));
+
+      if (s.items && s.items.length > 0) {
+        s.items.forEach(item => {
+          const pName = item.productName || 'Товар без названия';
+          const itemTotal = item.totalAmount || 0;
+          const itemPaid = Math.round(itemTotal * paidRatio);
+          const itemRemaining = Math.max(0, itemTotal - itemPaid);
+          const itemQty = item.quantity || 1;
+
+          if (!map.has(pName)) {
+            map.set(pName, {
+              productName: pName,
+              totalQty: 0,
+              totalDebtAmount: 0,
+              totalPaidAmount: 0,
+              remainingDebtAmount: 0,
+              debtorsMap: new Map()
+            });
+          }
+
+          const entry = map.get(pName)!;
+          entry.totalQty += itemQty;
+          entry.totalDebtAmount += itemTotal;
+          entry.totalPaidAmount += itemPaid;
+          entry.remainingDebtAmount += itemRemaining;
+
+          const dKey = `${s.debtorName || 'Покупатель'}_${s.id}`;
+          if (!entry.debtorsMap.has(dKey)) {
+            entry.debtorsMap.set(dKey, {
+              debtorName: s.debtorName || 'Покупатель',
+              qty: 0,
+              amount: 0,
+              paid: 0,
+              remaining: 0,
+              status: debtStatus,
+              date: s.timestamp || s.dateStr
+            });
+          }
+          const debtorEntry = entry.debtorsMap.get(dKey)!;
+          debtorEntry.qty += itemQty;
+          debtorEntry.amount += itemTotal;
+          debtorEntry.paid += itemPaid;
+          debtorEntry.remaining += itemRemaining;
+        });
+      }
+    });
+
+    let result = Array.from(map.values()).map(item => ({
+      ...item,
+      debtorsList: Array.from(item.debtorsMap.values())
+    }));
+
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      result = result.filter(item => {
+        const matchProduct = item.productName.toLowerCase().includes(q);
+        const matchDebtor = item.debtorsList.some(d => d.debtorName.toLowerCase().includes(q));
+        return matchProduct || matchDebtor;
+      });
+    }
+
+    return result.sort((a, b) => b.totalDebtAmount - a.totalDebtAmount);
+  }, [debtsList, sales, period, customStartDate, customEndDate, searchTerm]);
+
+  const debtProductsTotals = useMemo(() => {
+    let uniqueProductsCount = debtProductsSummary.length;
+    let totalUnitsSold = 0;
+    let totalDebtSum = 0;
+    let totalPaidSum = 0;
+    let totalRemainingSum = 0;
+
+    debtProductsSummary.forEach(p => {
+      totalUnitsSold += p.totalQty;
+      totalDebtSum += p.totalDebtAmount;
+      totalPaidSum += p.totalPaidAmount;
+      totalRemainingSum += p.remainingDebtAmount;
+    });
+
+    return {
+      uniqueProductsCount,
+      totalUnitsSold,
+      totalDebtSum,
+      totalPaidSum,
+      totalRemainingSum
+    };
+  }, [debtProductsSummary]);
 
   // Filter sales based on period and search/payment criteria
   const filteredSalesByPeriod = useMemo(() => {
@@ -1134,108 +1394,381 @@ export default function SalesAnalyticsModal({
 
               </div>
 
-              {/* REPAYMENTS HISTORY TABLE */}
-              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <History className="w-5 h-5 text-amber-400" />
-                    <div>
-                      <h3 className="text-sm font-bold text-white tracking-tight">
-                        Детализация поступивших платежей в счет долга
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        Список всех операций погашения за выбранный период
-                      </p>
-                    </div>
-                  </div>
+              {/* SUB-TABS NAVIGATION FOR DEBT ANALYTICS */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 p-3 rounded-2xl border border-slate-800">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => setDebtSubTab('products')}
+                    className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+                      debtSubTab === 'products'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-lg shadow-amber-950/30'
+                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    <Package className="w-4 h-4 text-amber-400" />
+                    <span>Товары в долг</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-mono border border-amber-500/30">
+                      {debtProductsTotals.uniqueProductsCount}
+                    </span>
+                  </button>
 
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1 sm:w-64">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input
-                        type="text"
-                        placeholder="Поиск по должнику или примечанию..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500 transition-colors"
-                      />
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => setDebtSubTab('debtors')}
+                    className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+                      debtSubTab === 'debtors'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-lg shadow-amber-950/30'
+                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    <User className="w-4 h-4 text-amber-400" />
+                    <span>Должники</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px] font-mono">
+                      {debtsList.length}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setDebtSubTab('repayments')}
+                    className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+                      debtSubTab === 'repayments'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-lg shadow-amber-950/30'
+                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    <History className="w-4 h-4 text-amber-400" />
+                    <span>История выплат</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px] font-mono">
+                      {filteredRepaymentsByPeriod.length}
+                    </span>
+                  </button>
                 </div>
 
-                {filteredRepaymentsByPeriod.length === 0 ? (
-                  <div className="p-8 text-center space-y-2 bg-slate-900/50 rounded-xl border border-slate-800/80">
-                    <Coins className="w-10 h-10 text-slate-600 mx-auto" />
-                    <p className="text-sm font-bold text-slate-300">Погашений долгов за указанный период не найдено</p>
-                    <p className="text-xs text-slate-500">
-                      Попробуйте изменить выбранный период времени или сбросить поисковый фильтр
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="hidden md:grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-900/90 rounded-xl border border-slate-800">
-                      <div className="col-span-3 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-slate-500" />
-                        <span>Дата и Время</span>
-                      </div>
-                      <div className="col-span-3 flex items-center gap-1">
-                        <User className="w-3 h-3 text-slate-500" />
-                        <span>Должник</span>
-                      </div>
-                      <div className="col-span-2 text-right">Сумма взноса</div>
-                      <div className="col-span-2 text-center">Статус долга</div>
-                      <div className="col-span-2">Примечание / Товар</div>
-                    </div>
-
-                    {filteredRepaymentsByPeriod.map((item) => (
-                      <div
-                        key={item.id}
-                        className="p-3 bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700 rounded-xl transition-all flex flex-col md:grid md:grid-cols-12 gap-2 text-xs items-start md:items-center"
-                      >
-                        <div className="md:col-span-3 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                          <span className="font-mono text-slate-300">
-                            {new Date(item.date).toLocaleDateString('ru-RU', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                        </div>
-
-                        <div className="md:col-span-3 font-bold text-white flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{item.debtorName}</span>
-                        </div>
-
-                        <div className="md:col-span-2 font-mono font-black text-emerald-400 md:text-right text-sm">
-                          +{item.amount.toLocaleString('ru-RU')} {currencySymbol}
-                        </div>
-
-                        <div className="md:col-span-2 text-center">
-                          {item.debtStatus === 'paid' ? (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold inline-flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Погашен
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold inline-flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" />
-                              Частичный
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="md:col-span-2 text-slate-400 text-[11px] truncate">
-                          {item.note || item.productName || 'Погашение долга'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Поиск по товару, должнику..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500 transition-colors"
+                  />
+                </div>
               </div>
+
+              {/* SUB-TAB 1: PRODUCTS SOLD ON CREDIT */}
+              {debtSubTab === 'products' && (
+                <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+                  {/* Summary Bar */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-xs font-mono">
+                    <div>
+                      <span className="text-slate-400 text-[10px] block">ПРОДАНО ШТУК В ДОЛГ</span>
+                      <strong className="text-amber-400 text-base">{debtProductsTotals.totalUnitsSold} шт.</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] block">СУММА ТОВАРОВ В ДОЛГ</span>
+                      <strong className="text-blue-400 text-base">{debtProductsTotals.totalDebtSum.toLocaleString('ru-RU')} {currencySymbol}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] block">ВЫПЛАЧЕНО ПО ТОВАРАМ</span>
+                      <strong className="text-emerald-400 text-base">+{debtProductsTotals.totalPaidSum.toLocaleString('ru-RU')} {currencySymbol}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] block">ОСТАТОК ПО ТОВАРАМ</span>
+                      <strong className="text-rose-400 text-base">{debtProductsTotals.totalRemainingSum.toLocaleString('ru-RU')} {currencySymbol}</strong>
+                    </div>
+                  </div>
+
+                  {debtProductsSummary.length === 0 ? (
+                    <div className="p-8 text-center space-y-2 bg-slate-900/50 rounded-xl border border-slate-800/80">
+                      <Package className="w-10 h-10 text-slate-600 mx-auto" />
+                      <p className="text-sm font-bold text-slate-300">Проданных товаров в долг за указанный период не найдено</p>
+                      <p className="text-xs text-slate-500">
+                        Попробуйте изменить период времени или сбросить поиск
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="hidden lg:grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-900/90 rounded-xl border border-slate-800">
+                        <div className="col-span-4 flex items-center gap-1">
+                          <Package className="w-3 h-3 text-slate-500" />
+                          <span>Наименование товара</span>
+                        </div>
+                        <div className="col-span-2 text-center">Кол-во в долг</div>
+                        <div className="col-span-2 text-right">Сумма в долг</div>
+                        <div className="col-span-2 text-right">Оплачено / Остаток</div>
+                        <div className="col-span-2 text-center">Должники</div>
+                      </div>
+
+                      {debtProductsSummary.map((item) => {
+                        const isExpanded = expandedProduct === item.productName;
+                        const repaidPercent = item.totalDebtAmount > 0 
+                          ? Math.round((item.totalPaidAmount / item.totalDebtAmount) * 100) 
+                          : 0;
+
+                        return (
+                          <div
+                            key={item.productName}
+                            className="bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700 rounded-2xl p-3.5 transition-all space-y-3"
+                          >
+                            <div className="flex flex-col lg:grid lg:grid-cols-12 gap-3 items-start lg:items-center text-xs">
+                              {/* Product Title */}
+                              <div className="lg:col-span-4 flex items-center gap-2.5 w-full">
+                                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
+                                  <Package className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="font-bold text-white text-sm truncate">{item.productName}</h4>
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    Возврат: {repaidPercent}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Quantity */}
+                              <div className="lg:col-span-2 lg:text-center">
+                                <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono font-bold text-xs">
+                                  {item.totalQty} шт.
+                                </span>
+                              </div>
+
+                              {/* Total Debt Amount */}
+                              <div className="lg:col-span-2 lg:text-right font-mono font-bold text-blue-400 text-sm">
+                                {item.totalDebtAmount.toLocaleString('ru-RU')} {currencySymbol}
+                              </div>
+
+                              {/* Paid / Remaining */}
+                              <div className="lg:col-span-2 lg:text-right font-mono space-y-0.5">
+                                <div className="text-emerald-400 text-xs font-bold">
+                                  +{item.totalPaidAmount.toLocaleString('ru-RU')} {currencySymbol}
+                                </div>
+                                {item.remainingDebtAmount > 0 ? (
+                                  <div className="text-rose-400 text-[11px]">
+                                    Остаток: {item.remainingDebtAmount.toLocaleString('ru-RU')} {currencySymbol}
+                                  </div>
+                                ) : (
+                                  <div className="text-emerald-500 text-[10px] font-bold">
+                                    Полностью закрыт
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Debtors count & toggle button */}
+                              <div className="lg:col-span-2 flex items-center justify-between lg:justify-center w-full lg:w-auto">
+                                <button
+                                  onClick={() => setExpandedProduct(isExpanded ? null : item.productName)}
+                                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all"
+                                >
+                                  <User className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>{item.debtorsList.length} покупат.</span>
+                                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* EXPANDED DETAILS: DEBTORS WHO BOUGHT THIS PRODUCT */}
+                            {isExpanded && (
+                              <div className="pt-3 border-t border-slate-800/80 space-y-2 animate-fadeIn">
+                                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">
+                                  Покупатели, взявшие "{item.productName}" в долг:
+                                </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {item.debtorsList.map((debtor, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="p-2.5 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center justify-between gap-2 text-xs"
+                                    >
+                                      <div className="space-y-0.5">
+                                        <div className="font-bold text-white flex items-center gap-1.5">
+                                          <User className="w-3.5 h-3.5 text-amber-400" />
+                                          <span>{debtor.debtorName}</span>
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 font-mono">
+                                          Взял: {debtor.qty} шт. | {new Date(debtor.date).toLocaleDateString('ru-RU')}
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right font-mono">
+                                        <div className="font-bold text-blue-300">
+                                          {debtor.amount.toLocaleString('ru-RU')} {currencySymbol}
+                                        </div>
+                                        {debtor.remaining > 0 ? (
+                                          <span className="text-[10px] text-amber-400 font-bold block">
+                                            Ост: {debtor.remaining.toLocaleString('ru-RU')} {currencySymbol}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-emerald-400 font-bold block">
+                                            Погашен
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SUB-TAB 2: DEBTORS LIST */}
+              {debtSubTab === 'debtors' && (
+                <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+                  {debtsList.length === 0 ? (
+                    <div className="p-8 text-center space-y-2 bg-slate-900/50 rounded-xl border border-slate-800/80">
+                      <User className="w-10 h-10 text-slate-600 mx-auto" />
+                      <p className="text-sm font-bold text-slate-300">Записей долгов не найдено</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {debtsList.map((debt) => {
+                        const remaining = Math.max(0, debt.totalAmount - debt.paidAmount);
+
+                        return (
+                          <div
+                            key={debt.id}
+                            className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-3 hover:border-slate-700 transition-all"
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center text-xs">
+                                  {debt.debtorName ? debt.debtorName[0].toUpperCase() : 'D'}
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-white text-sm">{debt.debtorName}</h4>
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    {new Date(debt.createdAt).toLocaleDateString('ru-RU')}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {debt.status === 'paid' || remaining === 0 ? (
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                                  Погашен
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                                  Долг: {remaining.toLocaleString('ru-RU')} {currencySymbol}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="space-y-1 text-xs">
+                              <div className="text-slate-400 text-[11px] flex items-center justify-between">
+                                <span>Товар / Вложение:</span>
+                                <strong className="text-white font-bold">{debt.productName || 'Товар в долг'}</strong>
+                              </div>
+                              <div className="text-slate-400 text-[11px] flex items-center justify-between font-mono">
+                                <span>Изначальная сумма:</span>
+                                <span className="text-blue-300 font-bold">{debt.totalAmount.toLocaleString('ru-RU')} {currencySymbol}</span>
+                              </div>
+                              <div className="text-slate-400 text-[11px] flex items-center justify-between font-mono">
+                                <span>Выплачено:</span>
+                                <span className="text-emerald-400 font-bold">+{debt.paidAmount.toLocaleString('ru-RU')} {currencySymbol}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SUB-TAB 3: REPAYMENTS HISTORY TABLE */}
+              {debtSubTab === 'repayments' && (
+                <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <History className="w-5 h-5 text-amber-400" />
+                      <div>
+                        <h3 className="text-sm font-bold text-white tracking-tight">
+                          Детализация поступивших платежей в счет долга
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          Список всех операций погашения за выбранный период
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {filteredRepaymentsByPeriod.length === 0 ? (
+                    <div className="p-8 text-center space-y-2 bg-slate-900/50 rounded-xl border border-slate-800/80">
+                      <Coins className="w-10 h-10 text-slate-600 mx-auto" />
+                      <p className="text-sm font-bold text-slate-300">Погашений долгов за указанный период не найдено</p>
+                      <p className="text-xs text-slate-500">
+                        Попробуйте изменить выбранный период времени или сбросить поисковый фильтр
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="hidden md:grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-900/90 rounded-xl border border-slate-800">
+                        <div className="col-span-3 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-500" />
+                          <span>Дата и Время</span>
+                        </div>
+                        <div className="col-span-3 flex items-center gap-1">
+                          <User className="w-3 h-3 text-slate-500" />
+                          <span>Должник</span>
+                        </div>
+                        <div className="col-span-2 text-right">Сумма взноса</div>
+                        <div className="col-span-2 text-center">Статус долга</div>
+                        <div className="col-span-2">Примечание / Товар</div>
+                      </div>
+
+                      {filteredRepaymentsByPeriod.map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-3 bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700 rounded-xl transition-all flex flex-col md:grid md:grid-cols-12 gap-2 text-xs items-start md:items-center"
+                        >
+                          <div className="md:col-span-3 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                            <span className="font-mono text-slate-300">
+                              {new Date(item.date).toLocaleDateString('ru-RU', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+
+                          <div className="md:col-span-3 font-bold text-white flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{item.debtorName}</span>
+                          </div>
+
+                          <div className="md:col-span-2 font-mono font-black text-emerald-400 md:text-right text-sm">
+                            +{item.amount.toLocaleString('ru-RU')} {currencySymbol}
+                          </div>
+
+                          <div className="md:col-span-2 text-center">
+                            {item.debtStatus === 'paid' ? (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Погашен
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                Частичный
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="md:col-span-2 text-slate-400 text-[11px] truncate">
+                            {item.note || item.productName || 'Погашение долга'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
