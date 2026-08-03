@@ -35,6 +35,7 @@ interface SalesAnalyticsModalProps {
   onClose: () => void;
   sales: SaleRecord[];
   debts?: DebtRecord[];
+  batches?: ShipmentBatch[];
   currencySymbol: string;
   targetCurrency: 'USD' | 'KGS';
   onDeleteSale?: (saleId: string) => void;
@@ -96,6 +97,7 @@ export default function SalesAnalyticsModal({
   onClose,
   sales = [],
   debts = [],
+  batches = [],
   currencySymbol = 'сом',
   targetCurrency = 'KGS',
   onDeleteSale,
@@ -340,16 +342,61 @@ export default function SalesAnalyticsModal({
       return true;
     };
 
+    const resolveItemCogs = (
+      pName: string, 
+      itemQty: number, 
+      itemTotal: number, 
+      itemObj?: any, 
+      saleObj?: any
+    ): number => {
+      if (itemObj) {
+        if (typeof itemObj.totalLandedCost === 'number' && itemObj.totalLandedCost > 0) {
+          return itemObj.totalLandedCost;
+        }
+        if (typeof itemObj.landedUnitCost === 'number' && itemObj.landedUnitCost > 0) {
+          return itemObj.landedUnitCost * itemQty;
+        }
+        if (typeof itemObj.profit === 'number') {
+          return Math.max(0, itemTotal - itemObj.profit);
+        }
+      }
+
+      if (saleObj && saleObj.totalRevenue > 0 && typeof saleObj.totalCogs === 'number' && saleObj.totalCogs > 0) {
+        return Math.round((saleObj.totalCogs / saleObj.totalRevenue) * itemTotal);
+      }
+
+      if (Array.isArray(batches) && batches.length > 0) {
+        const pNameClean = pName.toLowerCase().trim();
+        for (const batch of batches) {
+          if (batch.products) {
+            const found = batch.products.find(p => p.name?.toLowerCase().trim() === pNameClean || p.id === itemObj?.productId);
+            if (found) {
+              const landedUnit = (found as any).landedUnitCost || (found as any).costPrice || 0;
+              if (landedUnit > 0) {
+                return landedUnit * itemQty;
+              }
+            }
+          }
+        }
+      }
+
+      return 0;
+    };
+
     const map = new Map<string, {
       productName: string;
       totalQty: number;
       totalDebtAmount: number;
+      totalCogs: number;
+      netProfit: number;
       totalPaidAmount: number;
       remainingDebtAmount: number;
       debtorsMap: Map<string, {
         debtorName: string;
         qty: number;
         amount: number;
+        cogs: number;
+        profit: number;
         paid: number;
         remaining: number;
         status: 'active' | 'partial' | 'paid';
@@ -382,12 +429,16 @@ export default function SalesAnalyticsModal({
           const itemPaid = Math.round(itemTotal * paidRatio);
           const itemRemaining = Math.max(0, itemTotal - itemPaid);
           const itemQty = item.quantity || 1;
+          const itemCogs = resolveItemCogs(pName, itemQty, itemTotal, item, linkedSale);
+          const itemProfit = Math.max(0, itemTotal - itemCogs);
 
           if (!map.has(pName)) {
             map.set(pName, {
               productName: pName,
               totalQty: 0,
               totalDebtAmount: 0,
+              totalCogs: 0,
+              netProfit: 0,
               totalPaidAmount: 0,
               remainingDebtAmount: 0,
               debtorsMap: new Map()
@@ -397,6 +448,8 @@ export default function SalesAnalyticsModal({
           const entry = map.get(pName)!;
           entry.totalQty += itemQty;
           entry.totalDebtAmount += itemTotal;
+          entry.totalCogs += itemCogs;
+          entry.netProfit += itemProfit;
           entry.totalPaidAmount += itemPaid;
           entry.remainingDebtAmount += itemRemaining;
 
@@ -406,6 +459,8 @@ export default function SalesAnalyticsModal({
               debtorName: debt.debtorName || 'Покупатель',
               qty: 0,
               amount: 0,
+              cogs: 0,
+              profit: 0,
               paid: 0,
               remaining: 0,
               status: debt.status,
@@ -416,18 +471,24 @@ export default function SalesAnalyticsModal({
           const debtorEntry = entry.debtorsMap.get(dKey)!;
           debtorEntry.qty += itemQty;
           debtorEntry.amount += itemTotal;
+          debtorEntry.cogs += itemCogs;
+          debtorEntry.profit += itemProfit;
           debtorEntry.paid += itemPaid;
           debtorEntry.remaining += itemRemaining;
         });
       } else {
         const pName = debt.productName || 'Товар в долг';
         const itemQty = debt.quantity || 1;
+        const itemCogs = resolveItemCogs(pName, itemQty, totalDebt, undefined, linkedSale);
+        const itemProfit = Math.max(0, totalDebt - itemCogs);
 
         if (!map.has(pName)) {
           map.set(pName, {
             productName: pName,
             totalQty: 0,
             totalDebtAmount: 0,
+            totalCogs: 0,
+            netProfit: 0,
             totalPaidAmount: 0,
             remainingDebtAmount: 0,
             debtorsMap: new Map()
@@ -437,6 +498,8 @@ export default function SalesAnalyticsModal({
         const entry = map.get(pName)!;
         entry.totalQty += itemQty;
         entry.totalDebtAmount += totalDebt;
+        entry.totalCogs += itemCogs;
+        entry.netProfit += itemProfit;
         entry.totalPaidAmount += paidDebt;
         entry.remainingDebtAmount += remainingDebt;
 
@@ -446,6 +509,8 @@ export default function SalesAnalyticsModal({
             debtorName: debt.debtorName || 'Покупатель',
             qty: 0,
             amount: 0,
+            cogs: 0,
+            profit: 0,
             paid: 0,
             remaining: 0,
             status: debt.status,
@@ -456,6 +521,8 @@ export default function SalesAnalyticsModal({
         const debtorEntry = entry.debtorsMap.get(dKey)!;
         debtorEntry.qty += itemQty;
         debtorEntry.amount += totalDebt;
+        debtorEntry.cogs += itemCogs;
+        debtorEntry.profit += itemProfit;
         debtorEntry.paid += paidDebt;
         debtorEntry.remaining += remainingDebt;
       }
@@ -480,12 +547,16 @@ export default function SalesAnalyticsModal({
           const itemPaid = Math.round(itemTotal * paidRatio);
           const itemRemaining = Math.max(0, itemTotal - itemPaid);
           const itemQty = item.quantity || 1;
+          const itemCogs = resolveItemCogs(pName, itemQty, itemTotal, item, s);
+          const itemProfit = Math.max(0, itemTotal - itemCogs);
 
           if (!map.has(pName)) {
             map.set(pName, {
               productName: pName,
               totalQty: 0,
               totalDebtAmount: 0,
+              totalCogs: 0,
+              netProfit: 0,
               totalPaidAmount: 0,
               remainingDebtAmount: 0,
               debtorsMap: new Map()
@@ -495,6 +566,8 @@ export default function SalesAnalyticsModal({
           const entry = map.get(pName)!;
           entry.totalQty += itemQty;
           entry.totalDebtAmount += itemTotal;
+          entry.totalCogs += itemCogs;
+          entry.netProfit += itemProfit;
           entry.totalPaidAmount += itemPaid;
           entry.remainingDebtAmount += itemRemaining;
 
@@ -504,6 +577,8 @@ export default function SalesAnalyticsModal({
               debtorName: s.debtorName || 'Покупатель',
               qty: 0,
               amount: 0,
+              cogs: 0,
+              profit: 0,
               paid: 0,
               remaining: 0,
               status: debtStatus,
@@ -513,6 +588,8 @@ export default function SalesAnalyticsModal({
           const debtorEntry = entry.debtorsMap.get(dKey)!;
           debtorEntry.qty += itemQty;
           debtorEntry.amount += itemTotal;
+          debtorEntry.cogs += itemCogs;
+          debtorEntry.profit += itemProfit;
           debtorEntry.paid += itemPaid;
           debtorEntry.remaining += itemRemaining;
         });
@@ -534,26 +611,37 @@ export default function SalesAnalyticsModal({
     }
 
     return result.sort((a, b) => b.totalDebtAmount - a.totalDebtAmount);
-  }, [debtsList, sales, period, customStartDate, customEndDate, searchTerm]);
+  }, [debtsList, sales, batches, period, customStartDate, customEndDate, searchTerm]);
 
   const debtProductsTotals = useMemo(() => {
     let uniqueProductsCount = debtProductsSummary.length;
     let totalUnitsSold = 0;
     let totalDebtSum = 0;
+    let totalCogsSum = 0;
+    let totalNetProfitSum = 0;
     let totalPaidSum = 0;
     let totalRemainingSum = 0;
 
     debtProductsSummary.forEach(p => {
       totalUnitsSold += p.totalQty;
       totalDebtSum += p.totalDebtAmount;
+      totalCogsSum += p.totalCogs;
+      totalNetProfitSum += p.netProfit;
       totalPaidSum += p.totalPaidAmount;
       totalRemainingSum += p.remainingDebtAmount;
     });
+
+    const profitMarginPercent = totalDebtSum > 0 
+      ? Math.round((totalNetProfitSum / totalDebtSum) * 100) 
+      : 0;
 
     return {
       uniqueProductsCount,
       totalUnitsSold,
       totalDebtSum,
+      totalCogsSum,
+      totalNetProfitSum,
+      profitMarginPercent,
       totalPaidSum,
       totalRemainingSum
     };
@@ -1326,17 +1414,65 @@ export default function SalesAnalyticsModal({
           ) : (
             <div className="space-y-6 animate-fadeIn">
               {/* DEBT ANALYTICS KPI CARDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 
-                {/* Card 1: Collected in Selected Period */}
-                <div className="p-4 bg-slate-950/80 border border-emerald-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                {/* Card 1: Total Debt Revenue in Period */}
+                <div className="p-3.5 bg-slate-950/80 border border-blue-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl group-hover:bg-blue-500/10 transition-all pointer-events-none" />
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>1. ВЫРУЧКА В ДОЛГ</span>
+                    <DollarSign className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <p className="text-lg sm:text-xl font-black font-mono text-blue-400">
+                    {debtProductsTotals.totalDebtSum.toLocaleString('ru-RU')} <span className="text-xs font-normal text-blue-300">{currencySymbol}</span>
+                  </p>
+                  <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                    <span>Продано товаров:</span>
+                    <strong className="text-blue-300 font-bold">{debtProductsTotals.totalUnitsSold} шт.</strong>
+                  </div>
+                </div>
+
+                {/* Card 2: Cost Price (COGS) of Debt Goods */}
+                <div className="p-3.5 bg-slate-950/80 border border-amber-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>2. СЕБЕСТОИМОСТЬ</span>
+                    <Tag className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <p className="text-lg sm:text-xl font-black font-mono text-amber-300">
+                    {debtProductsTotals.totalCogsSum.toLocaleString('ru-RU')} <span className="text-xs font-normal text-amber-300">{currencySymbol}</span>
+                  </p>
+                  <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                    <span>Позиций товаров:</span>
+                    <strong className="text-amber-400 font-bold">{debtProductsTotals.uniqueProductsCount} наим.</strong>
+                  </div>
+                </div>
+
+                {/* Card 3: Net Profit from Debt Goods */}
+                <div className="p-3.5 bg-slate-950/80 border border-emerald-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
                   <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-                    <span>1. ПОГАШЕНО ЗА ПЕРИОД</span>
+                    <span>3. ЧИСТАЯ ПРИБЫЛЬ</span>
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <p className="text-lg sm:text-xl font-black font-mono text-emerald-400">
+                    +{debtProductsTotals.totalNetProfitSum.toLocaleString('ru-RU')} <span className="text-xs font-normal text-emerald-300">{currencySymbol}</span>
+                  </p>
+                  <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                    <span>Рентабельность:</span>
+                    <strong className="text-emerald-400 font-bold">{debtProductsTotals.profitMarginPercent}%</strong>
+                  </div>
+                </div>
+
+                {/* Card 4: Collected in Selected Period */}
+                <div className="p-3.5 bg-slate-950/80 border border-emerald-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>4. ПОГАШЕНО ЗА ПЕРИОД</span>
                     <ArrowDownRight className="w-4 h-4 text-emerald-400" />
                   </div>
-                  <p className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
-                    {debtStats.totalCollectedInPeriod.toLocaleString('ru-RU')} <span className="text-xs font-normal text-emerald-300">{currencySymbol}</span>
+                  <p className="text-lg sm:text-xl font-black font-mono text-emerald-400">
+                    +{debtStats.totalCollectedInPeriod.toLocaleString('ru-RU')} <span className="text-xs font-normal text-emerald-300">{currencySymbol}</span>
                   </p>
                   <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
                     <span>Платежей в отчете:</span>
@@ -1344,50 +1480,34 @@ export default function SalesAnalyticsModal({
                   </div>
                 </div>
 
-                {/* Card 2: Current Active Debt Balance */}
-                <div className="p-4 bg-slate-950/80 border border-amber-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
+                {/* Card 5: Current Active Debt Balance */}
+                <div className="p-3.5 bg-slate-950/80 border border-rose-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-xl group-hover:bg-rose-500/10 transition-all pointer-events-none" />
                   <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-                    <span>2. ТЕКУЩИЙ ОСТАТОК ДОЛГОВ</span>
-                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                    <span>5. ТЕКУЩИЙ ОСТАТОК</span>
+                    <AlertCircle className="w-4 h-4 text-rose-400" />
                   </div>
-                  <p className="text-xl sm:text-2xl font-black font-mono text-amber-400">
-                    {debtStats.totalActiveDebtBalance.toLocaleString('ru-RU')} <span className="text-xs font-normal text-amber-300">{currencySymbol}</span>
+                  <p className="text-lg sm:text-xl font-black font-mono text-rose-400">
+                    {debtStats.totalActiveDebtBalance.toLocaleString('ru-RU')} <span className="text-xs font-normal text-rose-300">{currencySymbol}</span>
                   </p>
                   <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
                     <span>Активных должников:</span>
-                    <strong className="text-amber-400 font-bold">{debtStats.activeDebtsCount} чел.</strong>
+                    <strong className="text-rose-400 font-bold">{debtStats.activeDebtsCount} чел.</strong>
                   </div>
                 </div>
 
-                {/* Card 3: Overall Debt Issued */}
-                <div className="p-4 bg-slate-950/80 border border-blue-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl group-hover:bg-blue-500/10 transition-all pointer-events-none" />
-                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-                    <span>3. ВСЕГО ВЫДАННО В ДОЛГ</span>
-                    <Receipt className="w-4 h-4 text-blue-400" />
-                  </div>
-                  <p className="text-xl sm:text-2xl font-black font-mono text-blue-400">
-                    {debtStats.overallDebtIssued.toLocaleString('ru-RU')} <span className="text-xs font-normal text-blue-300">{currencySymbol}</span>
-                  </p>
-                  <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
-                    <span>Всего записей долга:</span>
-                    <strong className="text-blue-300 font-bold">{debtStats.totalDebtsCount} шт.</strong>
-                  </div>
-                </div>
-
-                {/* Card 4: Overall Repayment Rate */}
-                <div className="p-4 bg-slate-950/80 border border-purple-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                {/* Card 6: Overall Repayment Rate */}
+                <div className="p-3.5 bg-slate-950/80 border border-purple-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-xl group-hover:bg-purple-500/10 transition-all pointer-events-none" />
                   <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-                    <span>4. ВОЗВРАТ ДОЛГОВ (%)</span>
+                    <span>6. ВОЗВРАТ ДОЛГОВ</span>
                     <CheckCircle2 className="w-4 h-4 text-purple-400" />
                   </div>
-                  <p className="text-xl sm:text-2xl font-black font-mono text-purple-400">
+                  <p className="text-lg sm:text-xl font-black font-mono text-purple-400">
                     {debtStats.repaymentPercentage}%
                   </p>
                   <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
-                    <span>Закрыто долгов полностью:</span>
+                    <span>Закрыто долгов:</span>
                     <strong className="text-purple-300 font-bold">{debtStats.paidDebtsCount} шт.</strong>
                   </div>
                 </div>
@@ -1459,22 +1579,27 @@ export default function SalesAnalyticsModal({
               {debtSubTab === 'products' && (
                 <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
                   {/* Summary Bar */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-xs font-mono">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-xs font-mono">
                     <div>
-                      <span className="text-slate-400 text-[10px] block">ПРОДАНО ШТУК В ДОЛГ</span>
+                      <span className="text-slate-400 text-[10px] uppercase block font-bold">ПРОДАНО ШТУК</span>
                       <strong className="text-amber-400 text-base">{debtProductsTotals.totalUnitsSold} шт.</strong>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] block">СУММА ТОВАРОВ В ДОЛГ</span>
+                      <span className="text-slate-400 text-[10px] uppercase block font-bold">ОБЩАЯ ВЫРУЧКА</span>
                       <strong className="text-blue-400 text-base">{debtProductsTotals.totalDebtSum.toLocaleString('ru-RU')} {currencySymbol}</strong>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] block">ВЫПЛАЧЕНО ПО ТОВАРАМ</span>
-                      <strong className="text-emerald-400 text-base">+{debtProductsTotals.totalPaidSum.toLocaleString('ru-RU')} {currencySymbol}</strong>
+                      <span className="text-slate-400 text-[10px] uppercase block font-bold">СЕБЕСТОИМОСТЬ</span>
+                      <strong className="text-amber-300 text-base">{debtProductsTotals.totalCogsSum.toLocaleString('ru-RU')} {currencySymbol}</strong>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] block">ОСТАТОК ПО ТОВАРАМ</span>
-                      <strong className="text-rose-400 text-base">{debtProductsTotals.totalRemainingSum.toLocaleString('ru-RU')} {currencySymbol}</strong>
+                      <span className="text-slate-400 text-[10px] uppercase block font-bold">ЧИСТАЯ ПРИБЫЛЬ</span>
+                      <strong className="text-emerald-400 text-base">+{debtProductsTotals.totalNetProfitSum.toLocaleString('ru-RU')} {currencySymbol}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase block font-bold">ПОГАШЕНО / ОСТАТОК</span>
+                      <div className="text-emerald-300 font-bold">+{debtProductsTotals.totalPaidSum.toLocaleString('ru-RU')} {currencySymbol}</div>
+                      <div className="text-rose-400 text-[11px]">Ост: {debtProductsTotals.totalRemainingSum.toLocaleString('ru-RU')} {currencySymbol}</div>
                     </div>
                   </div>
 
@@ -1489,14 +1614,15 @@ export default function SalesAnalyticsModal({
                   ) : (
                     <div className="space-y-3">
                       <div className="hidden lg:grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-900/90 rounded-xl border border-slate-800">
-                        <div className="col-span-4 flex items-center gap-1">
+                        <div className="col-span-3 flex items-center gap-1">
                           <Package className="w-3 h-3 text-slate-500" />
                           <span>Наименование товара</span>
                         </div>
-                        <div className="col-span-2 text-center">Кол-во в долг</div>
-                        <div className="col-span-2 text-right">Сумма в долг</div>
-                        <div className="col-span-2 text-right">Оплачено / Остаток</div>
-                        <div className="col-span-2 text-center">Должники</div>
+                        <div className="col-span-1 text-center">Кол-во</div>
+                        <div className="col-span-2 text-right">Выручка</div>
+                        <div className="col-span-2 text-right">Себестоимость</div>
+                        <div className="col-span-2 text-right">Прибыль</div>
+                        <div className="col-span-2 text-center">Покупатели</div>
                       </div>
 
                       {debtProductsSummary.map((item) => {
@@ -1512,44 +1638,47 @@ export default function SalesAnalyticsModal({
                           >
                             <div className="flex flex-col lg:grid lg:grid-cols-12 gap-3 items-start lg:items-center text-xs">
                               {/* Product Title */}
-                              <div className="lg:col-span-4 flex items-center gap-2.5 w-full">
+                              <div className="lg:col-span-3 flex items-center gap-2.5 w-full">
                                 <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
                                   <Package className="w-4 h-4" />
                                 </div>
                                 <div className="min-w-0">
                                   <h4 className="font-bold text-white text-sm truncate">{item.productName}</h4>
                                   <span className="text-[10px] text-slate-400 font-mono">
-                                    Возврат: {repaidPercent}%
+                                    Возврат: {repaidPercent}% | Оплачено: +{item.totalPaidAmount.toLocaleString('ru-RU')} {currencySymbol}
                                   </span>
                                 </div>
                               </div>
 
                               {/* Quantity */}
-                              <div className="lg:col-span-2 lg:text-center">
-                                <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono font-bold text-xs">
+                              <div className="lg:col-span-1 lg:text-center">
+                                <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono font-bold text-xs">
                                   {item.totalQty} шт.
                                 </span>
                               </div>
 
-                              {/* Total Debt Amount */}
-                              <div className="lg:col-span-2 lg:text-right font-mono font-bold text-blue-400 text-sm">
-                                {item.totalDebtAmount.toLocaleString('ru-RU')} {currencySymbol}
+                              {/* Total Debt Revenue */}
+                              <div className="lg:col-span-2 lg:text-right font-mono space-y-0.5">
+                                <div className="text-blue-400 font-bold text-sm">
+                                  {item.totalDebtAmount.toLocaleString('ru-RU')} {currencySymbol}
+                                </div>
+                                <span className="text-[10px] text-slate-500 block">Выручка</span>
                               </div>
 
-                              {/* Paid / Remaining */}
+                              {/* COGS */}
                               <div className="lg:col-span-2 lg:text-right font-mono space-y-0.5">
-                                <div className="text-emerald-400 text-xs font-bold">
-                                  +{item.totalPaidAmount.toLocaleString('ru-RU')} {currencySymbol}
+                                <div className="text-amber-300 font-bold text-sm">
+                                  {item.totalCogs.toLocaleString('ru-RU')} {currencySymbol}
                                 </div>
-                                {item.remainingDebtAmount > 0 ? (
-                                  <div className="text-rose-400 text-[11px]">
-                                    Остаток: {item.remainingDebtAmount.toLocaleString('ru-RU')} {currencySymbol}
-                                  </div>
-                                ) : (
-                                  <div className="text-emerald-500 text-[10px] font-bold">
-                                    Полностью закрыт
-                                  </div>
-                                )}
+                                <span className="text-[10px] text-slate-500 block">Себестоимость</span>
+                              </div>
+
+                              {/* Net Profit */}
+                              <div className="lg:col-span-2 lg:text-right font-mono space-y-0.5">
+                                <div className="text-emerald-400 font-bold text-sm">
+                                  +{item.netProfit.toLocaleString('ru-RU')} {currencySymbol}
+                                </div>
+                                <span className="text-[10px] text-slate-500 block">Чистая прибыль</span>
                               </div>
 
                               {/* Debtors count & toggle button */}

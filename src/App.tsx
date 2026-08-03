@@ -3287,6 +3287,7 @@ export default function App() {
         onClose={() => setShowSalesAnalyticsModal(false)}
         sales={sales || []}
         debts={debts || []}
+        batches={batches || []}
         currencySymbol={calculations?.currencySymbol || (activeBatch?.targetCurrency === 'USD' ? '$' : 'сом')}
         targetCurrency={activeBatch?.targetCurrency || 'KGS'}
         onDeleteSale={handleDeleteSale}
