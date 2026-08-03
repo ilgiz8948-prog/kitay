@@ -28,6 +28,7 @@ export interface ShipmentBatch {
   currencyRateUSDtoKGS: number; // $ to сом exchange rate (USD to KGS)
   targetCurrency: 'USD' | 'KGS';
   products: Product[];
+  isRatesSaved?: boolean; // Сохранены и заблокированы ли курсы валют партии
 }
 
 export interface AppSettings {

@@ -190,7 +190,7 @@ export default function App() {
 
   // Protected Product / Actions authorization state
   const [protectedProductAction, setProtectedProductAction] = useState<{
-    type: 'unlock' | 'delete' | 'clear_all' | 'delete_batch';
+    type: 'unlock' | 'delete' | 'clear_all' | 'delete_batch' | 'unlock_rates';
     product?: Product;
     batchId?: string;
   } | null>(null);
@@ -612,6 +612,10 @@ export default function App() {
   // Update active batch exchange rate
   const handleRateChange = (rateVal: any, rateType: 'USD' | 'KGS' | 'USD_KGS') => {
     if (!activeBatch) return;
+    if (activeBatch.isRatesSaved) {
+      requestUnlockRates();
+      return;
+    }
     const rate = parseDecimal(rateVal);
     
     let updatedBatch = { ...activeBatch };
@@ -633,6 +637,36 @@ export default function App() {
 
     setBatches(prev => prev.map(b => b.id === activeBatch.id ? updatedBatch : b));
     triggerBatchCloudSave(updatedBatch);
+  };
+
+  // Lock & save exchange rates for batch
+  const handleSaveRates = () => {
+    if (!activeBatch) return;
+    const updatedBatch = {
+      ...activeBatch,
+      isRatesSaved: true
+    };
+    setBatches(prev => prev.map(b => b.id === activeBatch.id ? updatedBatch : b));
+    triggerBatchCloudSave(updatedBatch);
+    setSaveToastMessage('Курсы валют партии сохранены и заблокированы');
+    setTimeout(() => setSaveToastMessage(null), 3000);
+  };
+
+  const handleUnlockRates = () => {
+    if (!activeBatch) return;
+    const updatedBatch = {
+      ...activeBatch,
+      isRatesSaved: false
+    };
+    setBatches(prev => prev.map(b => b.id === activeBatch.id ? updatedBatch : b));
+    triggerBatchCloudSave(updatedBatch);
+  };
+
+  const requestUnlockRates = () => {
+    if (!activeBatch) return;
+    setProtectedProductAction({ type: 'unlock_rates' });
+    setProductAuthPassword('');
+    setProductAuthError('');
   };
 
   // Manual save all action for explicit "Сохранить" button
@@ -662,6 +696,10 @@ export default function App() {
   // Switch target currency for active batch
   const handleTargetCurrencyChange = (currency: 'USD' | 'KGS') => {
     if (!activeBatch) return;
+    if (activeBatch.isRatesSaved) {
+      requestUnlockRates();
+      return;
+    }
     
     const updatedBatch: ShipmentBatch = {
       ...activeBatch,
@@ -873,6 +911,9 @@ export default function App() {
       } else if (protectedProductAction.type === 'delete_batch' && protectedProductAction.batchId) {
         performDeleteBatch(protectedProductAction.batchId);
         setSaveToastMessage('Партия удалена');
+      } else if (protectedProductAction.type === 'unlock_rates') {
+        handleUnlockRates();
+        setSaveToastMessage('Курсы валют разблокированы');
       }
 
       setProtectedProductAction(null);
@@ -1572,7 +1613,14 @@ export default function App() {
           {/* Section: Exchange Rates */}
           <section className="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/80">
             <h3 className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3 font-bold flex items-center justify-between">
-              <span>Курсы Валют ($ / ¥ / сом)</span>
+              <span className="flex items-center gap-1.5">
+                <span>Курсы Валют ($ / ¥ / сом)</span>
+                {activeBatch?.isRatesSaved && (
+                  <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                    Защищено
+                  </span>
+                )}
+              </span>
               <Coins className="w-3.5 h-3.5 text-amber-400" />
             </h3>
             
@@ -1589,9 +1637,13 @@ export default function App() {
                     id="sidebar-rate-usd-kgs"
                     type="text"
                     inputMode="decimal"
+                    readOnly={activeBatch?.isRatesSaved}
+                    onClick={activeBatch?.isRatesSaved ? requestUnlockRates : undefined}
                     value={activeBatch?.currencyRateUSDtoKGS ?? 88.0}
                     onChange={(e) => handleRateChange(e.target.value, 'USD_KGS')}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-lg py-1.5 pl-7 pr-3 text-sm font-mono text-amber-400 font-bold outline-none"
+                    className={`w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-lg py-1.5 pl-7 pr-3 text-sm font-mono text-amber-400 font-bold outline-none ${
+                      activeBatch?.isRatesSaved ? 'cursor-pointer opacity-90 hover:bg-slate-900/60' : ''
+                    }`}
                   />
                 </div>
               </div>
@@ -1608,9 +1660,13 @@ export default function App() {
                     id="sidebar-rate-kgs"
                     type="text"
                     inputMode="decimal"
+                    readOnly={activeBatch?.isRatesSaved}
+                    onClick={activeBatch?.isRatesSaved ? requestUnlockRates : undefined}
                     value={activeBatch?.currencyRateCNYtoKGS ?? 13.2}
                     onChange={(e) => handleRateChange(e.target.value, 'KGS')}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-lg py-1.5 pl-7 pr-3 text-sm font-mono text-purple-400 font-bold outline-none"
+                    className={`w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-lg py-1.5 pl-7 pr-3 text-sm font-mono text-purple-400 font-bold outline-none ${
+                      activeBatch?.isRatesSaved ? 'cursor-pointer opacity-90 hover:bg-slate-900/60' : ''
+                    }`}
                   />
                 </div>
               </div>
@@ -1627,9 +1683,13 @@ export default function App() {
                     id="sidebar-rate-usd"
                     type="text"
                     inputMode="decimal"
+                    readOnly={activeBatch?.isRatesSaved}
+                    onClick={activeBatch?.isRatesSaved ? requestUnlockRates : undefined}
                     value={activeBatch?.currencyRateCNYtoUSD ?? 0.15}
                     onChange={(e) => handleRateChange(e.target.value, 'USD')}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-lg py-1.5 pl-7 pr-3 text-sm font-mono text-blue-400 outline-none"
+                    className={`w-full bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-lg py-1.5 pl-7 pr-3 text-sm font-mono text-blue-400 outline-none ${
+                      activeBatch?.isRatesSaved ? 'cursor-pointer opacity-90 hover:bg-slate-900/60' : ''
+                    }`}
                   />
                 </div>
               </div>
@@ -1639,27 +1699,54 @@ export default function App() {
                 <label className="block text-[10px] text-slate-400 mb-1.5 font-mono uppercase">Расчетная валюта</label>
                 <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
                   <button
+                    disabled={activeBatch?.isRatesSaved}
                     onClick={() => handleTargetCurrencyChange('USD')}
                     className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
                       activeBatch?.targetCurrency === 'USD'
                         ? 'bg-blue-600/95 text-white shadow'
                         : 'text-slate-400 hover:text-white'
-                    }`}
+                    } ${activeBatch?.isRatesSaved ? 'opacity-80 cursor-not-allowed' : ''}`}
                   >
                     USD ($)
                   </button>
                   <button
+                    disabled={activeBatch?.isRatesSaved}
                     onClick={() => handleTargetCurrencyChange('KGS')}
                     className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
                       activeBatch?.targetCurrency === 'KGS'
                         ? 'bg-purple-600/95 text-white shadow'
                         : 'text-slate-400 hover:text-white'
-                    }`}
+                    } ${activeBatch?.isRatesSaved ? 'opacity-80 cursor-not-allowed' : ''}`}
                   >
                     KGS (сом)
                   </button>
                 </div>
               </div>
+
+              {/* Save / Lock Rates Button */}
+              {activeBatch && (
+                <div>
+                  {!activeBatch.isRatesSaved ? (
+                    <button
+                      type="button"
+                      onClick={handleSaveRates}
+                      className="w-full mt-1.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 border border-emerald-500/40"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Сохранить курсы партии</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={requestUnlockRates}
+                      className="w-full mt-1.5 py-2 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/60 text-amber-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Курсы заблокированы (Разблокировать)</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </section>
 
@@ -3013,6 +3100,8 @@ export default function App() {
                     ? 'Разблокировка товара'
                     : protectedProductAction.type === 'clear_all'
                     ? 'Очистка всех товаров'
+                    : protectedProductAction.type === 'unlock_rates'
+                    ? 'Разблокировка курсов валют'
                     : 'Удаление партии'}
                 </h3>
                 {protectedProductAction.product?.name ? (
@@ -3038,6 +3127,8 @@ export default function App() {
                 ? 'Этот товар сохранен и заблокирован от изменений. Пожалуйста, введите пароль приложения для разблокировки.'
                 : protectedProductAction.type === 'clear_all'
                 ? 'Вы собираетесь удалить все товары из этой партии. Введите пароль приложения для подтверждения.'
+                : protectedProductAction.type === 'unlock_rates'
+                ? 'Курсы валют в этой партии заблокированы от изменений. Введите пароль приложения для их разблокировки.'
                 : 'Вы собираетесь удалить эту партию со всеми её товарами. Введите пароль приложения для подтверждения.'}
             </p>
 
