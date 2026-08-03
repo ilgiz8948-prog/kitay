@@ -44,7 +44,8 @@ import {
   loadDebtsFromCloud,
   saveSaleToCloud,
   deleteSaleFromCloud,
-  loadSalesFromCloud
+  loadSalesFromCloud,
+  clearAllCloudData
 } from './firebase';
 import DebtsManager from './components/DebtsManager';
 import SoldProductsModal from './components/SoldProductsModal';
@@ -201,7 +202,7 @@ export default function App() {
 
   // Protected Product / Actions authorization state
   const [protectedProductAction, setProtectedProductAction] = useState<{
-    type: 'unlock' | 'delete' | 'clear_all' | 'delete_batch' | 'unlock_rates' | 'delete_debt' | 'restore_backup';
+    type: 'unlock' | 'delete' | 'clear_all' | 'delete_batch' | 'unlock_rates' | 'delete_debt' | 'restore_backup' | 'clear_all_data';
     product?: Product;
     batchId?: string;
     debtId?: string;
@@ -320,13 +321,13 @@ export default function App() {
       setActiveBatchId(exists && savedActiveId ? savedActiveId : localBatches[0].id);
     } else {
       const defaultBatch = createNewBatch('Первая поставка из Китая', 1, settings);
-      defaultBatch.products = [...sampleProducts];
+      defaultBatch.products = [];
       setBatches([defaultBatch]);
       setActiveBatchId(defaultBatch.id);
       saveLocal('sinocalc_batches_local', [defaultBatch]);
     }
 
-    const localDebts = getLocal<DebtRecord[]>('sinocalc_debts_local', sampleDebts);
+    const localDebts = getLocal<DebtRecord[]>('sinocalc_debts_local', []);
     setDebts(localDebts);
 
     const localSales = getLocal<SaleRecord[]>('sinocalc_sales_local', []);
@@ -1133,6 +1134,45 @@ export default function App() {
     setTimeout(() => setSaveToastMessage(null), 3500);
   };
 
+  const performClearAllData = async () => {
+    setSyncStatus('saving');
+
+    // 1. Reset sales history
+    setSales([]);
+    saveLocal('sinocalc_sales_local', []);
+
+    // 2. Reset debts history
+    setDebts([]);
+    saveLocal('sinocalc_debts_local', []);
+
+    // 3. Reset batches to 1 empty batch
+    const cleanBatch = createNewBatch('Первая поставка из Китая', 1, settings);
+    cleanBatch.products = [];
+    setBatches([cleanBatch]);
+    setActiveBatchId(cleanBatch.id);
+    saveLocal('sinocalc_batches_local', [cleanBatch]);
+    localStorage.setItem('sinocalc_active_id', cleanBatch.id);
+
+    // 4. Wipe cloud documents from Firestore (batches, debts, sales)
+    try {
+      await clearAllCloudData();
+      await saveBatchToCloud(cleanBatch);
+      setSyncStatus('synced');
+    } catch (err) {
+      console.warn('Cloud clear warning:', err);
+      setSyncStatus('synced');
+    }
+
+    setSaveToastMessage('✓ Все тестовые данные (склад, аналитика, отчеты и долги) очищены!');
+    setTimeout(() => setSaveToastMessage(null), 4000);
+  };
+
+  const requestClearAllData = () => {
+    setProtectedProductAction({ type: 'clear_all_data' });
+    setProductAuthPassword('');
+    setProductAuthError('');
+  };
+
   const handleConfirmProductAuth = (e: React.FormEvent) => {
     e.preventDefault();
     if (productAuthPassword.trim() === settings.passwordHash) {
@@ -1158,6 +1198,8 @@ export default function App() {
       } else if (protectedProductAction.type === 'unlock_rates') {
         handleUnlockRates();
         setSaveToastMessage('Курсы валют разблокированы');
+      } else if (protectedProductAction.type === 'clear_all_data') {
+        performClearAllData();
       }
 
       setProtectedProductAction(null);
@@ -3063,7 +3105,7 @@ export default function App() {
                   Вы можете скачать полную копию всей базы данных, чтобы сохранить её на диск компьютера или переслать в мессенджере. 
                   Для восстановления просто выберите сохраненный файл.
                 </p>
-                <div className="flex items-center gap-3 pt-1">
+                <div className="flex flex-wrap items-center gap-3 pt-1">
                   <button
                     onClick={handleExportData}
                     className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs rounded-lg border border-slate-800 flex items-center gap-1.5 transition-colors"
@@ -3081,6 +3123,13 @@ export default function App() {
                       className="hidden"
                     />
                   </label>
+                  <button
+                    onClick={requestClearAllData}
+                    className="px-3.5 py-1.5 bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-900/40 text-xs rounded-lg flex items-center gap-1.5 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    <span>Очистить все тестовые данные</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -3361,6 +3410,8 @@ export default function App() {
                     ? 'Удаление записи о долге'
                     : protectedProductAction.type === 'restore_backup'
                     ? 'Восстановление базы данных'
+                    : protectedProductAction.type === 'clear_all_data'
+                    ? 'Сброс всех тестовых данных'
                     : 'Удаление партии'}
                 </h3>
                 {protectedProductAction.product?.name ? (
@@ -3372,6 +3423,10 @@ export default function App() {
                     Должник: <span className="text-amber-300 font-semibold">
                       {debts.find(d => d.id === protectedProductAction.debtId)?.debtorName || 'Выбранная запись'}
                     </span>
+                  </p>
+                ) : protectedProductAction.type === 'clear_all_data' ? (
+                  <p className="text-xs text-red-400 font-semibold">
+                    Склад, Аналитика, Отчеты и Долги
                   </p>
                 ) : (
                   <p className="text-xs text-slate-400 truncate max-w-[240px]">
@@ -3398,6 +3453,8 @@ export default function App() {
                 ? 'Вы собираетесь удалить запись о долге. Введите пароль приложения для подтверждения.'
                 : protectedProductAction.type === 'restore_backup'
                 ? 'Восстановление резервной копии заменит текущие данные. Введите пароль приложения для подтверждения.'
+                : protectedProductAction.type === 'clear_all_data'
+                ? 'Вы собираетесь полностью очистить все тестовые записи склада, аналитики, отчетов и долгов. Введите пароль приложения для подтверждения.'
                 : 'Вы собираетесь удалить эту партию со всеми её товарами. Введите пароль приложения для подтверждения.'}
             </p>
 

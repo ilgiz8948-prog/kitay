@@ -150,3 +150,29 @@ export async function loadSalesFromCloud() {
   }
 }
 
+// Helper to clear all test data (batches, debts, sales) from Firestore
+export async function clearAllCloudData() {
+  try {
+    const batchesCol = collection(db, 'batches');
+    const batchesSnap = await getDocs(batchesCol);
+    for (const d of batchesSnap.docs) {
+      await deleteDoc(doc(db, 'batches', d.id));
+    }
+
+    const debtsCol = collection(db, 'debts');
+    const debtsSnap = await getDocs(debtsCol);
+    for (const d of debtsSnap.docs) {
+      await deleteDoc(doc(db, 'debts', d.id));
+    }
+
+    const salesCol = collection(db, 'sales');
+    const salesSnap = await getDocs(salesCol);
+    for (const d of salesSnap.docs) {
+      await deleteDoc(doc(db, 'sales', d.id));
+    }
+  } catch (error) {
+    console.error('Error clearing all cloud data:', error);
+    throw error;
+  }
+}
+
