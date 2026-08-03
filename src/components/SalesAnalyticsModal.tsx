@@ -36,22 +36,76 @@ interface SalesAnalyticsModalProps {
 
 type PeriodFilter = 'today' | 'yesterday' | '7days' | '30days' | 'all' | 'custom';
 
+// Safe date helpers to prevent RangeError / invalid date crashes
+const safeGetDateStr = (dateVal: any): string => {
+  if (!dateVal) return new Date().toISOString().split('T')[0];
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+    return d.toISOString().split('T')[0];
+  } catch {
+    return new Date().toISOString().split('T')[0];
+  }
+};
+
+const safeFormatLabel = (dateStr: string): string => {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+      }
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+};
+
+const safeFormatTime = (timestampVal: any): string => {
+  if (!timestampVal) return '';
+  try {
+    const d = new Date(timestampVal);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+};
+
 export default function SalesAnalyticsModal({
   isOpen,
   onClose,
   sales = [],
-  currencySymbol,
-  targetCurrency,
+  currencySymbol = 'сом',
+  targetCurrency = 'KGS',
   onDeleteSale
 }: SalesAnalyticsModalProps) {
   const [period, setPeriod] = useState<PeriodFilter>('7days');
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
+    try {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      return d.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
   });
   const [customEndDate, setCustomEndDate] = useState<string>(() => {
-    return new Date().toISOString().split('T')[0];
+    try {
+      return new Date().toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
   });
 
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -61,11 +115,11 @@ export default function SalesAnalyticsModal({
   if (!isOpen) return null;
 
   // Helper date utility strings
-  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  const getTodayStr = () => safeGetDateStr(new Date());
   const getYesterdayStr = () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    return safeGetDateStr(d);
   };
 
   // Filter sales based on period and search/payment criteria
@@ -82,10 +136,19 @@ export default function SalesAnalyticsModal({
     thirtyDaysAgo.setDate(now.getDate() - 29);
     thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-    return sales.filter(s => {
+    const salesList = Array.isArray(sales) ? sales : [];
+
+    return salesList.filter(s => {
+      if (!s) return false;
       // Date filter
-      const saleDateStr = s.dateStr || (s.timestamp ? s.timestamp.split('T')[0] : '');
-      const saleDateObj = s.timestamp ? new Date(s.timestamp) : new Date(saleDateStr);
+      const saleDateStr = s.dateStr || (s.timestamp ? safeGetDateStr(s.timestamp) : '');
+      let saleDateObj: Date;
+      try {
+        saleDateObj = s.timestamp ? new Date(s.timestamp) : new Date(saleDateStr);
+        if (isNaN(saleDateObj.getTime())) saleDateObj = new Date();
+      } catch {
+        saleDateObj = new Date();
+      }
 
       if (period === 'today') {
         if (saleDateStr !== todayStr) return false;
@@ -160,11 +223,9 @@ export default function SalesAnalyticsModal({
 
   // Generate Daily Chart Data according to selected period
   const dailyChartData = useMemo(() => {
-    // Map date string "YYYY-MM-DD" -> { revenue, cogs, profit, count }
     const daysMap: Record<string, { dateStr: string; label: string; revenue: number; cogs: number; profit: number; count: number }> = {};
+    const datesSet = new Set<string>();
 
-    // Determine range dates
-    const datesList: string[] = [];
     const endDate = new Date();
     let startDate = new Date();
 
@@ -181,38 +242,35 @@ export default function SalesAnalyticsModal({
       startDate.setDate(startDate.getDate() - 29);
     } else if (period === 'custom') {
       startDate = customStartDate ? new Date(customStartDate) : new Date();
+      if (isNaN(startDate.getTime())) startDate = new Date();
     } else {
-      // all
       startDate = new Date();
-      startDate.setDate(startDate.getDate() - 14); // default 15 days view for 'all'
+      startDate.setDate(startDate.getDate() - 14);
     }
 
-    // Populate dates list
     const curr = new Date(startDate);
     const end = period === 'yesterday' ? new Date(startDate) : endDate;
     
-    // Safety cap to 60 days max for chart
     let count = 0;
     while (curr <= end && count < 60) {
-      const dStr = curr.toISOString().split('T')[0];
-      const label = curr.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+      const dStr = safeGetDateStr(curr);
+      const label = safeFormatLabel(dStr);
       daysMap[dStr] = { dateStr: dStr, label, revenue: 0, cogs: 0, profit: 0, count: 0 };
-      datesList.push(dStr);
+      datesSet.add(dStr);
       curr.setDate(curr.getDate() + 1);
       count++;
     }
 
-    // Fill sales data into daysMap
     filteredSalesByPeriod.forEach(s => {
-      const dStr = s.dateStr || (s.timestamp ? s.timestamp.split('T')[0] : '');
+      const dStr = s.dateStr || safeGetDateStr(s.timestamp);
+      if (!dStr) return;
       if (daysMap[dStr]) {
         daysMap[dStr].revenue += s.totalRevenue || 0;
         daysMap[dStr].cogs += s.totalCogs || 0;
         daysMap[dStr].profit += s.netProfit || 0;
         daysMap[dStr].count += 1;
       } else {
-        // If date was not pre-populated (e.g. for 'all' or custom), create it
-        const label = new Date(dStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+        const label = safeFormatLabel(dStr);
         daysMap[dStr] = {
           dateStr: dStr,
           label,
@@ -221,14 +279,13 @@ export default function SalesAnalyticsModal({
           profit: s.netProfit || 0,
           count: 1
         };
-        datesList.push(dStr);
+        datesSet.add(dStr);
       }
     });
 
-    const sortedDates = datesList.sort();
-    const result = sortedDates.map(dStr => daysMap[dStr]);
+    const sortedDates = Array.from(datesSet).sort();
+    const result = sortedDates.map(dStr => daysMap[dStr]).filter(Boolean);
 
-    // Find max value for scaling SVG chart bars
     let maxVal = 0;
     result.forEach(d => {
       if (d.revenue > maxVal) maxVal = d.revenue;
@@ -676,9 +733,9 @@ export default function SalesAnalyticsModal({
                             </h4>
 
                             <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 font-mono flex-wrap">
-                              <span>Дата: <strong className="text-slate-200">{sale.dateStr}</strong></span>
+                              <span>Дата: <strong className="text-slate-200">{sale.dateStr || safeGetDateStr(sale.timestamp)}</strong></span>
                               {sale.timestamp && (
-                                <span>Время: <strong className="text-slate-300">{new Date(sale.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</strong></span>
+                                <span>Время: <strong className="text-slate-300">{safeFormatTime(sale.timestamp)}</strong></span>
                               )}
                               {sale.batchName && (
                                 <span>Партия: <strong className="text-purple-300">{sale.batchName}</strong></span>
@@ -692,17 +749,17 @@ export default function SalesAnalyticsModal({
                           <div className="text-left sm:text-right font-mono">
                             <span className="text-[10px] text-slate-500 block">Выручка / Себестоимость</span>
                             <span className="text-xs font-bold text-emerald-400">
-                              {sale.totalRevenue.toLocaleString('ru-RU')} {currencySymbol}
+                              {(sale.totalRevenue || 0).toLocaleString('ru-RU')} {currencySymbol}
                             </span>
                             <span className="text-[10px] text-blue-400 block">
-                              (Себест: {sale.totalCogs.toLocaleString('ru-RU')} {currencySymbol})
+                              (Себест: {(sale.totalCogs || 0).toLocaleString('ru-RU')} {currencySymbol})
                             </span>
                           </div>
 
                           <div className="text-right font-mono">
                             <span className="text-[10px] text-slate-500 block">Чистая прибыль</span>
-                            <span className={`text-xs font-bold ${sale.netProfit >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
-                              +{sale.netProfit.toLocaleString('ru-RU')} {currencySymbol}
+                            <span className={`text-xs font-bold ${(sale.netProfit || 0) >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
+                              {(sale.netProfit || 0) >= 0 ? '+' : ''}{(sale.netProfit || 0).toLocaleString('ru-RU')} {currencySymbol}
                             </span>
                           </div>
 

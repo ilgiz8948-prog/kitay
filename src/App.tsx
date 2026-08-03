@@ -3211,8 +3211,8 @@ export default function App() {
       <SalesAnalyticsModal
         isOpen={showSalesAnalyticsModal}
         onClose={() => setShowSalesAnalyticsModal(false)}
-        sales={sales}
-        currencySymbol={calculations.currencySymbol}
+        sales={sales || []}
+        currencySymbol={calculations?.currencySymbol || (activeBatch?.targetCurrency === 'USD' ? '$' : 'сом')}
         targetCurrency={activeBatch?.targetCurrency || 'KGS'}
         onDeleteSale={handleDeleteSale}
       />
