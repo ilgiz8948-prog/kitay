@@ -480,6 +480,7 @@ export default function App() {
     isDebt: boolean;
     debtorName?: string;
     debtorPhone?: string;
+    debtorPhotoUrl?: string;
     initialPayment?: number;
     deductStock: boolean;
   }) => {
@@ -506,6 +507,7 @@ export default function App() {
       await handleAddDebt({
         debtorName: saleData.debtorName,
         phone: saleData.debtorPhone || '',
+        debtorPhotoUrl: saleData.debtorPhotoUrl || '',
         productName: `${saleData.productName} (${saleData.quantity} шт, ${priceTypeName})`,
         totalAmount: saleData.totalAmount,
         currency: activeBatch?.targetCurrency || 'KGS',

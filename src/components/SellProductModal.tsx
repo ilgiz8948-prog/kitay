@@ -17,7 +17,9 @@ import {
   ArrowRight,
   Sparkles,
   Image as ImageIcon,
-  Check
+  Check,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { Product } from '../types';
 
@@ -45,6 +47,7 @@ interface SellProductModalProps {
     isDebt: boolean;
     debtorName?: string;
     debtorPhone?: string;
+    debtorPhotoUrl?: string;
     initialPayment?: number;
     deductStock: boolean;
   }) => void;
@@ -70,7 +73,43 @@ export default function SellProductModal({
   const [isDebtMode, setIsDebtMode] = useState<boolean>(false);
   const [debtorName, setDebtorName] = useState<string>('');
   const [debtorPhone, setDebtorPhone] = useState<string>('');
+  const [debtorPhotoUrl, setDebtorPhotoUrl] = useState<string>('');
   const [initialPayment, setInitialPayment] = useState<string>('0');
+
+  // Debtor photo upload handler with compression
+  const handleDebtorPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX_SIZE = 500;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setDebtorPhotoUrl(compressedDataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Success message modal state
   const [showSuccessToast, setShowSuccessToast] = useState<boolean>(false);
@@ -151,6 +190,7 @@ export default function SellProductModal({
       isDebt: isDebtMode,
       debtorName: isDebtMode ? debtorName.trim() : undefined,
       debtorPhone: isDebtMode ? debtorPhone.trim() : undefined,
+      debtorPhotoUrl: isDebtMode ? debtorPhotoUrl || undefined : undefined,
       initialPayment: isDebtMode ? initPayNum : undefined,
       deductStock
     });
@@ -591,6 +631,61 @@ export default function SellProductModal({
                           onChange={(e) => setDebtorPhone(e.target.value)}
                           placeholder="+996 555 123456"
                           className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 pl-8 pr-3 py-2 rounded-xl text-xs text-white outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Фото должника */}
+                  <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <label className="block text-[11px] text-slate-300 font-bold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Фото должника (необязательно)</span>
+                      </span>
+                      {debtorPhotoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setDebtorPhotoUrl('')}
+                          className="text-[10px] text-red-400 hover:underline"
+                        >
+                          Удалить фото
+                        </button>
+                      )}
+                    </label>
+
+                    <div className="flex items-center gap-3">
+                      {debtorPhotoUrl ? (
+                        <img 
+                          src={debtorPhotoUrl} 
+                          alt="Фото должника" 
+                          className="w-12 h-12 rounded-xl object-cover border border-amber-500/50 shadow-md flex-shrink-0" 
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-slate-900 border border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500 flex-shrink-0">
+                          <Camera className="w-4 h-4 text-slate-600" />
+                          <span className="text-[8px] text-slate-500 mt-0.5">Нет фото</span>
+                        </div>
+                      )}
+
+                      <div className="flex-1 space-y-1.5">
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors">
+                          <Upload className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{debtorPhotoUrl ? 'Заменить фото' : 'Загрузить фото'}</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleDebtorPhotoChange} 
+                            className="hidden" 
+                          />
+                        </label>
+
+                        <input
+                          type="url"
+                          value={debtorPhotoUrl.startsWith('data:') ? '' : debtorPhotoUrl}
+                          onChange={(e) => setDebtorPhotoUrl(e.target.value)}
+                          placeholder="Или ссылка на фото (URL)"
+                          className="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl py-1 px-2.5 text-[10px] text-white outline-none"
                         />
                       </div>
                     </div>
