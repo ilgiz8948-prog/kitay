@@ -51,8 +51,6 @@ export default function SoldProductsModal({
   const [searchTerm, setSearchTerm] = useState('');
   const [profitFilter, setProfitFilter] = useState<'all' | 'high_profit' | 'retail' | 'wholesale'>('all');
 
-  if (!isOpen) return null;
-
   // KPI Calculations
   const stats = useMemo(() => {
     let totalCogs = 0;
@@ -94,6 +92,8 @@ export default function SoldProductsModal({
       return true;
     });
   }, [products, searchTerm, profitFilter]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 animate-fadeIn">

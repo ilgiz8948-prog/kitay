@@ -112,8 +112,6 @@ export default function SalesAnalyticsModal({
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'cash' | 'debt'>('all');
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
 
-  if (!isOpen) return null;
-
   // Helper date utility strings
   const getTodayStr = () => safeGetDateStr(new Date());
   const getYesterdayStr = () => {
@@ -331,6 +329,8 @@ export default function SalesAnalyticsModal({
     link.click();
     document.body.removeChild(link);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fadeIn">
