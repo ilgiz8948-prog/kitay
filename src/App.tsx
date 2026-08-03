@@ -2152,7 +2152,23 @@ export default function App() {
                     <FileSpreadsheet className="w-4 h-4 text-blue-500" />
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">Склад</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setShowSellProductModal(true)}
+                      className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-950/40"
+                      title="Открыть окно создания продажи (Опт / Розница / В долг)"
+                    >
+                      <ShoppingBag className="w-4 h-4" />
+                      <span>ПРОДАЖА</span>
+                    </button>
+                    <button
+                      onClick={() => setShowSalesAnalyticsModal(true)}
+                      className="px-3.5 py-2 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md"
+                      title="Открыть аналитику продаж (Выручка, Прибыль, Графики)"
+                    >
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      <span className="hidden sm:inline">АНАЛИТИКА ПРОДАЖ</span>
+                    </button>
                     {calculations.productsCalculated.some(p => !p.isSaved) && (
                       <button
                         onClick={handleSaveAllProducts}
@@ -3185,6 +3201,7 @@ export default function App() {
         currencySymbol={calculations.currencySymbol}
         targetCurrency={activeBatch?.targetCurrency || 'KGS'}
         onTransferToDebt={handleTransferToDebt}
+        onOpenSalesAnalytics={() => setShowSalesAnalyticsModal(true)}
       />
 
       {/* 6. SELL PRODUCT MODAL */}
@@ -3205,6 +3222,7 @@ export default function App() {
         batches={batches}
         debts={debts}
         activeBatchId={activeBatchId}
+        onOpenSalesAnalytics={() => setShowSalesAnalyticsModal(true)}
       />
 
       {/* 7.5 SALES ANALYTICS MODAL */}

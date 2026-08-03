@@ -32,6 +32,7 @@ interface AnalyticsModalProps {
   batches: ShipmentBatch[];
   debts: DebtRecord[];
   activeBatchId: string;
+  onOpenSalesAnalytics?: () => void;
 }
 
 type DetailType = 'cogs' | 'retail' | 'wholesale' | 'debts' | 'inventory' | 'expenses' | 'top' | null;
@@ -41,7 +42,8 @@ export default function AnalyticsModal({
   onClose,
   batches = [],
   debts = [],
-  activeBatchId
+  activeBatchId,
+  onOpenSalesAnalytics
 }: AnalyticsModalProps) {
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
   const [showPrintReport, setShowPrintReport] = useState<boolean>(false);
@@ -313,6 +315,20 @@ export default function AnalyticsModal({
                 ))}
               </select>
             </div>
+
+            {onOpenSalesAnalytics && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenSalesAnalytics();
+                }}
+                className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow"
+                title="Открыть детализированный отчет по фактически проданным чекам"
+              >
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span className="hidden sm:inline">Аналитика Продаж</span>
+              </button>
+            )}
 
             <button
               onClick={() => setShowPrintReport(!showPrintReport)}

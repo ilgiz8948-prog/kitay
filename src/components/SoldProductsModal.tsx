@@ -35,6 +35,7 @@ interface SoldProductsModalProps {
   currencySymbol: string;
   targetCurrency: 'USD' | 'KGS';
   onTransferToDebt?: (productName: string, amount: number) => void;
+  onOpenSalesAnalytics?: () => void;
 }
 
 export default function SoldProductsModal({
@@ -44,7 +45,8 @@ export default function SoldProductsModal({
   batchName,
   currencySymbol,
   targetCurrency,
-  onTransferToDebt
+  onTransferToDebt,
+  onOpenSalesAnalytics
 }: SoldProductsModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [profitFilter, setProfitFilter] = useState<'all' | 'high_profit' | 'retail' | 'wholesale'>('all');
@@ -116,13 +118,29 @@ export default function SoldProductsModal({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl transition-all"
-            title="Закрыть окно"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenSalesAnalytics && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenSalesAnalytics();
+                }}
+                className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow"
+                title="Перейти в чеки и графики продаж"
+              >
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span className="hidden sm:inline">Аналитика продаж</span>
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl transition-all"
+              title="Закрыть окно"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* MODAL BODY (SCROLLABLE) */}

@@ -488,11 +488,11 @@ export default function SalesAnalyticsModal({
                 <DollarSign className="w-4 h-4 text-emerald-400" />
               </div>
               <p className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
-                {stats.totalRevenue.toLocaleString('ru-RU')} <span className="text-xs font-normal text-emerald-300">{currencySymbol}</span>
+                {(stats.totalRevenue || 0).toLocaleString('ru-RU')} <span className="text-xs font-normal text-emerald-300">{currencySymbol}</span>
               </p>
               <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80">
-                <span>Нал: <strong className="text-white">{stats.cashRevenue.toLocaleString('ru-RU')}</strong></span>
-                <span>Долг: <strong className="text-amber-400">{stats.debtRevenue.toLocaleString('ru-RU')}</strong></span>
+                <span>Нал: <strong className="text-white">{(stats.cashRevenue || 0).toLocaleString('ru-RU')}</strong></span>
+                <span>Долг: <strong className="text-amber-400">{(stats.debtRevenue || 0).toLocaleString('ru-RU')}</strong></span>
               </div>
             </div>
 
@@ -504,7 +504,7 @@ export default function SalesAnalyticsModal({
                 <Package className="w-4 h-4 text-blue-400" />
               </div>
               <p className="text-xl sm:text-2xl font-black font-mono text-blue-400">
-                {stats.totalCogs.toLocaleString('ru-RU')} <span className="text-xs font-normal text-blue-300">{currencySymbol}</span>
+                {(stats.totalCogs || 0).toLocaleString('ru-RU')} <span className="text-xs font-normal text-blue-300">{currencySymbol}</span>
               </p>
               <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80">
                 <span>Себестоимость проданных товаров</span>
@@ -518,12 +518,12 @@ export default function SalesAnalyticsModal({
                 <span>3. ЧИСТАЯ ПРИБЫЛЬ</span>
                 <TrendingUp className="w-4 h-4 text-purple-400" />
               </div>
-              <p className={`text-xl sm:text-2xl font-black font-mono ${stats.netProfit >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
-                {stats.netProfit >= 0 ? '+' : ''}{stats.netProfit.toLocaleString('ru-RU')} <span className="text-xs font-normal text-purple-300">{currencySymbol}</span>
+              <p className={`text-xl sm:text-2xl font-black font-mono ${(stats.netProfit || 0) >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
+                {(stats.netProfit || 0) >= 0 ? '+' : ''}{(stats.netProfit || 0).toLocaleString('ru-RU')} <span className="text-xs font-normal text-purple-300">{currencySymbol}</span>
               </p>
               <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80">
                 <span>Рентабельность:</span>
-                <strong className="text-purple-300 font-bold">{stats.profitMarginPercent}%</strong>
+                <strong className="text-purple-300 font-bold">{stats.profitMarginPercent || 0}%</strong>
               </div>
             </div>
 
@@ -535,11 +535,11 @@ export default function SalesAnalyticsModal({
                 <ShoppingBag className="w-4 h-4 text-amber-400" />
               </div>
               <p className="text-xl sm:text-2xl font-black font-mono text-amber-400">
-                {stats.totalItemsCount} <span className="text-xs font-normal text-slate-400">шт</span>
+                {stats.totalItemsCount || 0} <span className="text-xs font-normal text-slate-400">шт</span>
               </p>
               <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80">
                 <span>Транзакций:</span>
-                <strong className="text-white">{stats.totalTransactions} чеков</strong>
+                <strong className="text-white">{stats.totalTransactions || 0} чеков</strong>
               </div>
             </div>
 
@@ -595,9 +595,9 @@ export default function SalesAnalyticsModal({
                         {/* Hover Tooltip Card */}
                         <div className="absolute -top-24 bg-slate-900 border border-slate-700 p-2 rounded-xl text-[10px] font-mono shadow-2xl z-20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-36 text-center space-y-0.5">
                           <p className="font-bold text-white border-b border-slate-800 pb-1">{day.label} ({day.dateStr})</p>
-                          <p className="text-emerald-400 font-bold">Выручка: {day.revenue.toLocaleString('ru-RU')} {currencySymbol}</p>
-                          <p className="text-blue-400">Себест: {day.cogs.toLocaleString('ru-RU')} {currencySymbol}</p>
-                          <p className="text-purple-400 font-bold">Прибыль: +{day.profit.toLocaleString('ru-RU')} {currencySymbol}</p>
+                          <p className="text-emerald-400 font-bold">Выручка: {(day.revenue || 0).toLocaleString('ru-RU')} {currencySymbol}</p>
+                          <p className="text-blue-400">Себест: {(day.cogs || 0).toLocaleString('ru-RU')} {currencySymbol}</p>
+                          <p className="text-purple-400 font-bold">Прибыль: +{(day.profit || 0).toLocaleString('ru-RU')} {currencySymbol}</p>
                         </div>
 
                         {/* Tri-Bar Column Group */}
