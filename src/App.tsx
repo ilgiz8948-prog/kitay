@@ -51,6 +51,7 @@ import SoldProductsModal from './components/SoldProductsModal';
 import SellProductModal from './components/SellProductModal';
 import AnalyticsModal from './components/AnalyticsModal';
 import SalesAnalyticsModal from './components/SalesAnalyticsModal';
+import ReceiptModal from './components/ReceiptModal';
 
 // Helper to create a new empty batch
 const createNewBatch = (name: string, index: number, settings: AppSettings): ShipmentBatch => ({
@@ -194,6 +195,8 @@ export default function App() {
   const [showSellProductModal, setShowSellProductModal] = useState<boolean>(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState<boolean>(false);
   const [showSalesAnalyticsModal, setShowSalesAnalyticsModal] = useState<boolean>(false);
+  const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
+  const [selectedReceiptSale, setSelectedReceiptSale] = useState<SaleRecord | null>(null);
   const [previewProductPhotoUrl, setPreviewProductPhotoUrl] = useState<string | null>(null);
 
   // Protected Product / Actions authorization state
@@ -668,6 +671,8 @@ export default function App() {
         notes: `Продажа из партии: ${activeBatch?.name || 'Китай'}`
       }, saleData.initialPayment || 0);
     }
+
+    return newSaleRecord;
   };
 
 
@@ -3213,6 +3218,10 @@ export default function App() {
         currencySymbol={calculations.currencySymbol}
         targetCurrency={activeBatch?.targetCurrency || 'KGS'}
         onCompleteSale={handleCompleteSale}
+        onOpenReceipt={(sale) => {
+          setSelectedReceiptSale(sale);
+          setShowReceiptModal(true);
+        }}
       />
 
       {/* 7. ANALYTICS & FINANCIAL REPORT MODAL */}
@@ -3233,6 +3242,19 @@ export default function App() {
         currencySymbol={calculations?.currencySymbol || (activeBatch?.targetCurrency === 'USD' ? '$' : 'сом')}
         targetCurrency={activeBatch?.targetCurrency || 'KGS'}
         onDeleteSale={handleDeleteSale}
+        onOpenReceipt={(sale) => {
+          setSelectedReceiptSale(sale);
+          setShowReceiptModal(true);
+        }}
+      />
+
+      {/* 7.6 COMMERCIAL RECEIPT MODAL */}
+      <ReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        sale={selectedReceiptSale}
+        currencySymbol={calculations?.currencySymbol || (activeBatch?.targetCurrency === 'USD' ? '$' : 'сом')}
+        storeName={activeBatch?.name ? `SinoCalc (${activeBatch.name})` : 'SinoCalc Commerce'}
       />
 
       {/* 7. PRODUCT PHOTO PREVIEW LIGHTBOX MODAL */}

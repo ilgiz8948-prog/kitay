@@ -32,6 +32,7 @@ interface SalesAnalyticsModalProps {
   currencySymbol: string;
   targetCurrency: 'USD' | 'KGS';
   onDeleteSale?: (saleId: string) => void;
+  onOpenReceipt?: (sale: SaleRecord) => void;
 }
 
 type PeriodFilter = 'today' | 'yesterday' | '7days' | '30days' | 'all' | 'custom';
@@ -88,7 +89,8 @@ export default function SalesAnalyticsModal({
   sales = [],
   currencySymbol = 'сом',
   targetCurrency = 'KGS',
-  onDeleteSale
+  onDeleteSale,
+  onOpenReceipt
 }: SalesAnalyticsModalProps) {
   const [period, setPeriod] = useState<PeriodFilter>('7days');
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
@@ -762,6 +764,21 @@ export default function SalesAnalyticsModal({
                               {(sale.netProfit || 0) >= 0 ? '+' : ''}{(sale.netProfit || 0).toLocaleString('ru-RU')} {currencySymbol}
                             </span>
                           </div>
+
+                          {onOpenReceipt && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenReceipt(sale);
+                              }}
+                              className="px-2.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-bold text-xs rounded-xl flex items-center gap-1 transition-all shadow-sm"
+                              title="Открыть, распечатать или отправить товарный чек клиенту"
+                            >
+                              <Receipt className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Чек</span>
+                            </button>
+                          )}
 
                           {onDeleteSale && (
                             <button

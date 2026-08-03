@@ -22,9 +22,12 @@ import {
   Minus,
   CheckSquare,
   Square,
-  ShoppingCart
+  ShoppingCart,
+  Receipt,
+  Printer,
+  Send
 } from 'lucide-react';
-import { Product } from '../types';
+import { Product, SaleRecord } from '../types';
 
 export interface CalculatedProductForSale extends Product {
   landedUnitCost: number;
@@ -65,7 +68,8 @@ interface SellProductModalProps {
   batchName: string;
   currencySymbol: string;
   targetCurrency: 'USD' | 'KGS';
-  onCompleteSale: (saleData: CompleteSalePayload) => void;
+  onCompleteSale: (saleData: CompleteSalePayload) => SaleRecord | any;
+  onOpenReceipt?: (sale: SaleRecord) => void;
 }
 
 export interface CartItem {
@@ -88,7 +92,8 @@ export default function SellProductModal({
   batchName,
   currencySymbol,
   targetCurrency,
-  onCompleteSale
+  onCompleteSale,
+  onOpenReceipt
 }: SellProductModalProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -104,6 +109,7 @@ export default function SellProductModal({
   // Success message modal state
   const [showSuccessToast, setShowSuccessToast] = useState<boolean>(false);
   const [lastSoldSummary, setLastSoldSummary] = useState<string>('');
+  const [lastCreatedSale, setLastCreatedSale] = useState<SaleRecord | null>(null);
 
   // Initialize cart when modal opens
   useEffect(() => {
@@ -303,7 +309,7 @@ export default function SellProductModal({
       ? `"${primaryItem.productName}" (${primaryItem.quantity} шт)`
       : `${cart.length} наименований (${totalPcs} шт)`;
 
-    onCompleteSale({
+    const createdSaleResult = onCompleteSale({
       items: saleItemsData,
       productId: primaryItem.productId,
       productName: primaryItem.productName,
@@ -319,17 +325,16 @@ export default function SellProductModal({
       deductStock
     });
 
+    if (createdSaleResult && createdSaleResult.id) {
+      setLastCreatedSale(createdSaleResult);
+    }
+
     const summaryText = isDebtMode
       ? `Продано в долг: ${summaryTitle} на сумму ${totalAmount.toLocaleString('ru-RU')} ${currencySymbol} (Покупатель: ${debtorName})`
       : `Успешно продано: ${summaryTitle} на сумму ${totalAmount.toLocaleString('ru-RU')} ${currencySymbol}!`;
 
     setLastSoldSummary(summaryText);
     setShowSuccessToast(true);
-
-    setTimeout(() => {
-      setShowSuccessToast(false);
-      onClose();
-    }, 1800);
   };
 
   return (
@@ -370,7 +375,7 @@ export default function SellProductModal({
 
         {/* TOAST / SUCCESS OVERLAY */}
         {showSuccessToast ? (
-          <div className="p-8 flex flex-col items-center justify-center text-center space-y-4 my-auto animate-scaleIn">
+          <div className="p-8 flex flex-col items-center justify-center text-center space-y-5 my-auto animate-scaleIn">
             <div className="w-16 h-16 bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-400 rounded-full flex items-center justify-center">
               <CheckCircle2 className="w-10 h-10 animate-bounce" />
             </div>
@@ -378,6 +383,34 @@ export default function SellProductModal({
             <p className="text-sm text-slate-300 max-w-md font-medium bg-slate-950 p-4 rounded-2xl border border-slate-800">
               {lastSoldSummary}
             </p>
+
+            <div className="flex items-center gap-3 flex-wrap justify-center pt-2">
+              {onOpenReceipt && lastCreatedSale && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSuccessToast(false);
+                    onClose();
+                    onOpenReceipt(lastCreatedSale);
+                  }}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-950/50"
+                >
+                  <Receipt className="w-4 h-4" />
+                  <span>Открыть / Отправить товарный чек</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSuccessToast(false);
+                  onClose();
+                }}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-all border border-slate-700"
+              >
+                Закрыть окно
+              </button>
+            </div>
           </div>
         ) : (
           /* MAIN FORM CONTENT - Split 2-panel view on desktop */
