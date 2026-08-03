@@ -190,9 +190,11 @@ export default function App() {
 
   // Protected Product / Actions authorization state
   const [protectedProductAction, setProtectedProductAction] = useState<{
-    type: 'unlock' | 'delete' | 'clear_all' | 'delete_batch' | 'unlock_rates';
+    type: 'unlock' | 'delete' | 'clear_all' | 'delete_batch' | 'unlock_rates' | 'delete_debt' | 'restore_backup';
     product?: Product;
     batchId?: string;
+    debtId?: string;
+    backupData?: any;
   } | null>(null);
   const [productAuthPassword, setProductAuthPassword] = useState<string>('');
   const [productAuthError, setProductAuthError] = useState<string>('');
@@ -404,20 +406,28 @@ export default function App() {
     }
   };
 
-  const handleDeleteDebt = async (debtId: string) => {
-    if (confirm('Вы уверены, что хотите удалить эту запись о долге?')) {
-      const remaining = debts.filter(d => d.id !== debtId);
-      setDebts(remaining);
-      saveLocal('sinocalc_debts_local', remaining);
-      try {
-        setSyncStatus('saving');
-        await deleteDebtFromCloud(debtId);
-        setSyncStatus('synced');
-      } catch (err) {
-        console.error('Failed to delete debt from cloud:', err);
-        setSyncStatus('error');
-      }
+  const performDeleteDebt = async (debtId: string) => {
+    const remaining = debts.filter(d => d.id !== debtId);
+    setDebts(remaining);
+    saveLocal('sinocalc_debts_local', remaining);
+    try {
+      setSyncStatus('saving');
+      await deleteDebtFromCloud(debtId);
+      setSyncStatus('synced');
+    } catch (err) {
+      console.error('Failed to delete debt from cloud:', err);
+      setSyncStatus('error');
     }
+  };
+
+  const requestDeleteDebt = (debtId: string) => {
+    setProtectedProductAction({ type: 'delete_debt', debtId });
+    setProductAuthPassword('');
+    setProductAuthError('');
+  };
+
+  const handleDeleteDebt = async (debtId: string) => {
+    requestDeleteDebt(debtId);
   };
 
   const handleAddPayment = async (debtId: string, amount: number, note?: string) => {
@@ -896,6 +906,37 @@ export default function App() {
     setProductAuthError('');
   };
 
+  const requestRestoreBackup = (parsedData: any) => {
+    setProtectedProductAction({ type: 'restore_backup', backupData: parsedData });
+    setProductAuthPassword('');
+    setProductAuthError('');
+  };
+
+  const performRestoreBackup = async (parsed: any) => {
+    if (!parsed || !Array.isArray(parsed.batches)) return;
+    setSyncStatus('saving');
+    setBatches(parsed.batches);
+    if (parsed.batches.length > 0) {
+      setActiveBatchId(parsed.batches[0].id);
+    }
+    if (Array.isArray(parsed.debts)) {
+      setDebts(parsed.debts);
+      for (const d of parsed.debts) {
+        await saveDebtToCloud(d);
+      }
+    }
+    if (parsed.settings) {
+      setSettings(parsed.settings);
+      await saveSettingsToCloud(parsed.settings);
+    }
+    for (const batch of parsed.batches) {
+      await saveBatchToCloud(batch);
+    }
+    setSyncStatus('synced');
+    setSaveToastMessage('Данные успешно импортированы и сохранены в облако!');
+    setTimeout(() => setSaveToastMessage(null), 3500);
+  };
+
   const handleConfirmProductAuth = (e: React.FormEvent) => {
     e.preventDefault();
     if (productAuthPassword.trim() === settings.passwordHash) {
@@ -913,6 +954,11 @@ export default function App() {
       } else if (protectedProductAction.type === 'delete_batch' && protectedProductAction.batchId) {
         performDeleteBatch(protectedProductAction.batchId);
         setSaveToastMessage('Партия удалена');
+      } else if (protectedProductAction.type === 'delete_debt' && protectedProductAction.debtId) {
+        performDeleteDebt(protectedProductAction.debtId);
+        setSaveToastMessage('Запись о долге удалена');
+      } else if (protectedProductAction.type === 'restore_backup' && protectedProductAction.backupData) {
+        performRestoreBackup(protectedProductAction.backupData);
       } else if (protectedProductAction.type === 'unlock_rates') {
         handleUnlockRates();
         setSaveToastMessage('Курсы валют разблокированы');
@@ -996,30 +1042,7 @@ export default function App() {
 
   // Delete batch entirely
   const handleDeleteBatch = async (batchId: string) => {
-    if (batches.length <= 1) {
-      alert('Нельзя удалить последнюю оставшуюся партию.');
-      return;
-    }
-    if (confirm('Вы уверены, что хотите удалить эту партию и все товары в ней?')) {
-      const remaining = batches.filter(b => b.id !== batchId);
-      setBatches(remaining);
-      saveLocal('sinocalc_batches_local', remaining);
-      
-      if (activeBatchId === batchId) {
-        const nextId = remaining[0].id;
-        setActiveBatchId(nextId);
-        localStorage.setItem('sinocalc_active_id', nextId);
-      }
-
-      try {
-        setSyncStatus('saving');
-        await deleteBatchFromCloud(batchId);
-        setSyncStatus('synced');
-      } catch (err) {
-        console.error('Error deleting batch from cloud:', err);
-        setSyncStatus('error');
-      }
-    }
+    requestDeleteBatch(batchId);
   };
 
   // Start editing batch name
@@ -1069,16 +1092,7 @@ export default function App() {
 
   // Empty all products
   const handleClearProducts = () => {
-    if (!activeBatch) return;
-    if (confirm('Удалить ВСЕ товары из этой партии?')) {
-      const updatedBatch = {
-        ...activeBatch,
-        products: []
-      };
-
-      setBatches(prev => prev.map(b => b.id === activeBatch.id ? updatedBatch : b));
-      triggerBatchCloudSave(updatedBatch);
-    }
+    requestClearProducts();
   };
 
   // Manual trigger to pull fresh data from cloud
@@ -1118,29 +1132,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed && Array.isArray(parsed.batches)) {
-          if (confirm(`Вы уверены, что хотите восстановить ${parsed.batches.length} партий? Это заменит ваши текущие локальные и облачные данные.`)) {
-            setSyncStatus('saving');
-            setBatches(parsed.batches);
-            if (parsed.batches.length > 0) {
-              setActiveBatchId(parsed.batches[0].id);
-            }
-            if (Array.isArray(parsed.debts)) {
-              setDebts(parsed.debts);
-              for (const d of parsed.debts) {
-                await saveDebtToCloud(d);
-              }
-            }
-            if (parsed.settings) {
-              setSettings(parsed.settings);
-              await saveSettingsToCloud(parsed.settings);
-            }
-            // Save each restored batch to cloud
-            for (const batch of parsed.batches) {
-              await saveBatchToCloud(batch);
-            }
-            setSyncStatus('synced');
-            alert('Данные успешно импортированы и сохранены в облако!');
-          }
+          requestRestoreBackup(parsed);
         } else {
           alert('Неверный формат файла резервной копии.');
         }
@@ -1150,6 +1142,7 @@ export default function App() {
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
   };
 
 
@@ -3097,18 +3090,28 @@ export default function App() {
               <div>
                 <h3 className="text-base font-bold text-white">
                   {protectedProductAction.type === 'delete'
-                    ? 'Удаление защищенного товара'
+                    ? 'Удаление товара'
                     : protectedProductAction.type === 'unlock'
                     ? 'Разблокировка товара'
                     : protectedProductAction.type === 'clear_all'
                     ? 'Очистка всех товаров'
                     : protectedProductAction.type === 'unlock_rates'
                     ? 'Разблокировка курсов валют'
+                    : protectedProductAction.type === 'delete_debt'
+                    ? 'Удаление записи о долге'
+                    : protectedProductAction.type === 'restore_backup'
+                    ? 'Восстановление базы данных'
                     : 'Удаление партии'}
                 </h3>
                 {protectedProductAction.product?.name ? (
                   <p className="text-xs text-slate-400 truncate max-w-[240px]">
                     Товар: <span className="text-amber-300 font-semibold">{protectedProductAction.product.name}</span>
+                  </p>
+                ) : protectedProductAction.type === 'delete_debt' ? (
+                  <p className="text-xs text-slate-400 truncate max-w-[240px]">
+                    Должник: <span className="text-amber-300 font-semibold">
+                      {debts.find(d => d.id === protectedProductAction.debtId)?.debtorName || 'Выбранная запись'}
+                    </span>
                   </p>
                 ) : (
                   <p className="text-xs text-slate-400 truncate max-w-[240px]">
@@ -3124,13 +3127,17 @@ export default function App() {
 
             <p className="text-xs text-slate-300 mb-4 leading-relaxed">
               {protectedProductAction.type === 'delete'
-                ? 'Этот товар сохранен и заблокирован от изменений. Пожалуйста, введите пароль приложения для его удаления.'
+                ? 'Для удаления данного товара введите пароль приложения.'
                 : protectedProductAction.type === 'unlock'
                 ? 'Этот товар сохранен и заблокирован от изменений. Пожалуйста, введите пароль приложения для разблокировки.'
                 : protectedProductAction.type === 'clear_all'
                 ? 'Вы собираетесь удалить все товары из этой партии. Введите пароль приложения для подтверждения.'
                 : protectedProductAction.type === 'unlock_rates'
                 ? 'Курсы валют в этой партии заблокированы от изменений. Введите пароль приложения для их разблокировки.'
+                : protectedProductAction.type === 'delete_debt'
+                ? 'Вы собираетесь удалить запись о долге. Введите пароль приложения для подтверждения.'
+                : protectedProductAction.type === 'restore_backup'
+                ? 'Восстановление резервной копии заменит текущие данные. Введите пароль приложения для подтверждения.'
                 : 'Вы собираетесь удалить эту партию со всеми её товарами. Введите пароль приложения для подтверждения.'}
             </p>
 
