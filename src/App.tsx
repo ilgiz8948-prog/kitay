@@ -493,11 +493,29 @@ export default function App() {
     debtorPhotoUrl?: string;
     initialPayment?: number;
     deductStock: boolean;
+    items?: Array<{
+      productId: string;
+      productName: string;
+      quantity: number;
+      priceType: 'wholesale' | 'retail';
+      unitPrice: number;
+      totalAmount: number;
+    }>;
   }) => {
     if (saleData.deductStock && activeBatch) {
+      const qtyMap = new Map<string, number>();
+      if (saleData.items && saleData.items.length > 0) {
+        saleData.items.forEach(item => {
+          qtyMap.set(item.productId, (qtyMap.get(item.productId) || 0) + item.quantity);
+        });
+      } else if (saleData.productId) {
+        qtyMap.set(saleData.productId, saleData.quantity);
+      }
+
       const updatedProducts = activeBatch.products.map(p => {
-        if (p.id === saleData.productId) {
-          const newQty = Math.max(0, p.quantity - saleData.quantity);
+        if (qtyMap.has(p.id)) {
+          const deductQty = qtyMap.get(p.id)!;
+          const newQty = Math.max(0, p.quantity - deductQty);
           return { ...p, quantity: newQty };
         }
         return p;
@@ -513,15 +531,18 @@ export default function App() {
     }
 
     if (saleData.isDebt && saleData.debtorName) {
-      const priceTypeName = saleData.priceType === 'wholesale' ? 'Опт' : 'Розница';
+      const debtProductName = saleData.items && saleData.items.length > 0
+        ? saleData.items.map(i => `${i.productName} (${i.quantity} шт, ${i.priceType === 'wholesale' ? 'Опт' : 'Розница'})`).join(', ')
+        : `${saleData.productName} (${saleData.quantity} шт)`;
+
       await handleAddDebt({
         debtorName: saleData.debtorName,
         phone: saleData.debtorPhone || '',
         debtorPhotoUrl: saleData.debtorPhotoUrl || '',
-        productName: `${saleData.productName} (${saleData.quantity} шт, ${priceTypeName})`,
+        productName: debtProductName,
         totalAmount: saleData.totalAmount,
         currency: activeBatch?.targetCurrency || 'KGS',
-        notes: `Продажа (${priceTypeName}) из партии: ${activeBatch?.name || 'Китай'}`
+        notes: `Продажа из партии: ${activeBatch?.name || 'Китай'}`
       }, saleData.initialPayment || 0);
     }
   };
