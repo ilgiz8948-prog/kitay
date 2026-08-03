@@ -21,7 +21,10 @@ import {
   Coins,
   Clock,
   User,
-  Package
+  Package,
+  History,
+  PieChart,
+  ArrowDownRight
 } from 'lucide-react';
 import { SaleRecord, DebtRecord, ShipmentBatch } from '../types';
 
@@ -37,6 +40,7 @@ interface SalesAnalyticsModalProps {
 }
 
 type PeriodFilter = 'today' | 'yesterday' | '7days' | '30days' | 'all' | 'custom';
+type AnalyticsTab = 'sales' | 'debts';
 
 // Safe date helpers to prevent RangeError / invalid date crashes
 const safeGetDateStr = (dateVal: any): string => {
@@ -94,6 +98,7 @@ export default function SalesAnalyticsModal({
   onDeleteSale,
   onOpenReceipt
 }: SalesAnalyticsModalProps) {
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('sales');
   const [period, setPeriod] = useState<PeriodFilter>('7days');
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
     try {
@@ -155,6 +160,47 @@ export default function SalesAnalyticsModal({
     };
   };
 
+  // Extract all individual debt repayment events across all debts
+  const allDebtRepayments = useMemo(() => {
+    const list: Array<{
+      id: string;
+      debtId: string;
+      debtorName: string;
+      amount: number;
+      date: string;
+      dateStr: string;
+      note?: string;
+      currency: string;
+      productName?: string;
+      debtStatus: 'active' | 'partial' | 'paid';
+      totalAmount: number;
+      paidAmount: number;
+    }> = [];
+
+    debtsList.forEach(debt => {
+      if (!debt || !debt.payments) return;
+      debt.payments.forEach(p => {
+        const pDateStr = safeGetDateStr(p.date);
+        list.push({
+          id: p.id || `${debt.id}_${p.date}`,
+          debtId: debt.id,
+          debtorName: debt.debtorName || 'Покупатель',
+          amount: p.amount || 0,
+          date: p.date,
+          dateStr: pDateStr,
+          note: p.note,
+          currency: debt.currency || 'KGS',
+          productName: debt.productName,
+          debtStatus: debt.status,
+          totalAmount: debt.totalAmount,
+          paidAmount: debt.paidAmount
+        });
+      });
+    });
+
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [debtsList]);
+
   // Helper date utility strings
   const getTodayStr = () => safeGetDateStr(new Date());
   const getYesterdayStr = () => {
@@ -162,6 +208,96 @@ export default function SalesAnalyticsModal({
     d.setDate(d.getDate() - 1);
     return safeGetDateStr(d);
   };
+
+  // Filter debt repayments by period and search term
+  const filteredRepaymentsByPeriod = useMemo(() => {
+    const todayStr = getTodayStr();
+    const yesterdayStr = getYesterdayStr();
+    const now = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 29);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    return allDebtRepayments.filter(r => {
+      const pDateStr = r.dateStr;
+      let pDateObj: Date;
+      try {
+        pDateObj = new Date(r.date);
+        if (isNaN(pDateObj.getTime())) pDateObj = new Date(pDateStr);
+      } catch {
+        pDateObj = new Date();
+      }
+
+      if (period === 'today') {
+        if (pDateStr !== todayStr) return false;
+      } else if (period === 'yesterday') {
+        if (pDateStr !== yesterdayStr) return false;
+      } else if (period === '7days') {
+        if (pDateObj < sevenDaysAgo) return false;
+      } else if (period === '30days') {
+        if (pDateObj < thirtyDaysAgo) return false;
+      } else if (period === 'custom') {
+        if (customStartDate && pDateStr < customStartDate) return false;
+        if (customEndDate && pDateStr > customEndDate) return false;
+      }
+
+      if (searchTerm.trim()) {
+        const query = searchTerm.toLowerCase();
+        const matchesDebtor = r.debtorName?.toLowerCase().includes(query);
+        const matchesNote = r.note?.toLowerCase().includes(query);
+        const matchesProduct = r.productName?.toLowerCase().includes(query);
+        if (!matchesDebtor && !matchesNote && !matchesProduct) return false;
+      }
+
+      return true;
+    });
+  }, [allDebtRepayments, period, customStartDate, customEndDate, searchTerm]);
+
+  // Aggregated Debt Metrics
+  const debtStats = useMemo(() => {
+    let totalCollectedInPeriod = 0;
+    filteredRepaymentsByPeriod.forEach(r => {
+      totalCollectedInPeriod += r.amount || 0;
+    });
+
+    let totalActiveDebtBalance = 0;
+    let totalDebtsCount = debtsList.length;
+    let activeDebtsCount = 0;
+    let paidDebtsCount = 0;
+    let overallDebtIssued = 0;
+    let overallDebtPaid = 0;
+
+    debtsList.forEach(d => {
+      overallDebtIssued += d.totalAmount || 0;
+      overallDebtPaid += d.paidAmount || 0;
+      const remaining = Math.max(0, (d.totalAmount || 0) - (d.paidAmount || 0));
+      if (d.status === 'paid' || remaining <= 0) {
+        paidDebtsCount++;
+      } else {
+        activeDebtsCount++;
+        totalActiveDebtBalance += remaining;
+      }
+    });
+
+    const repaymentPercentage = overallDebtIssued > 0 
+      ? Math.round((overallDebtPaid / overallDebtIssued) * 100) 
+      : 0;
+
+    return {
+      totalCollectedInPeriod,
+      totalActiveDebtBalance,
+      totalDebtsCount,
+      activeDebtsCount,
+      paidDebtsCount,
+      overallDebtIssued,
+      overallDebtPaid,
+      repaymentPercentage
+    };
+  }, [filteredRepaymentsByPeriod, debtsList]);
 
   // Filter sales based on period and search/payment criteria
   const filteredSalesByPeriod = useMemo(() => {
@@ -423,6 +559,39 @@ export default function SalesAnalyticsModal({
           </div>
         </div>
 
+        {/* MAIN TABS: SALES VS DEBT ANALYTICS */}
+        <div className="bg-slate-950 p-2.5 px-4 border-b border-slate-800 flex items-center justify-start gap-2 flex-shrink-0">
+          <button
+            onClick={() => setActiveTab('sales')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              activeTab === 'sales'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/50'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Аналитика продаж</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-800/80 text-emerald-300 text-[11px] font-mono">
+              {stats.totalTransactions}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('debts')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              activeTab === 'debts'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/50'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Coins className="w-4 h-4 text-amber-300" />
+            <span>Аналитика долгов и погашений</span>
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-mono border border-amber-500/30">
+              {filteredRepaymentsByPeriod.length} платежей
+            </span>
+          </button>
+        </div>
+
         {/* PERIOD SELECTOR TABS */}
         <div className="bg-slate-950/60 p-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -522,7 +691,9 @@ export default function SalesAnalyticsModal({
         {/* MODAL BODY (SCROLLABLE) */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
           
-          {/* KPI STAT CARDS */}
+          {activeTab === 'sales' ? (
+            <>
+              {/* KPI STAT CARDS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
             
             {/* Card 1: Total Revenue */}
@@ -891,14 +1062,196 @@ export default function SalesAnalyticsModal({
             </div>
 
           </div>
+            </>
+          ) : (
+            <div className="space-y-6 animate-fadeIn">
+              {/* DEBT ANALYTICS KPI CARDS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+                
+                {/* Card 1: Collected in Selected Period */}
+                <div className="p-4 bg-slate-950/80 border border-emerald-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>1. ПОГАШЕНО ЗА ПЕРИОД</span>
+                    <ArrowDownRight className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <p className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                    {debtStats.totalCollectedInPeriod.toLocaleString('ru-RU')} <span className="text-xs font-normal text-emerald-300">{currencySymbol}</span>
+                  </p>
+                  <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                    <span>Платежей в отчете:</span>
+                    <strong className="text-emerald-400 font-bold">{filteredRepaymentsByPeriod.length} шт.</strong>
+                  </div>
+                </div>
+
+                {/* Card 2: Current Active Debt Balance */}
+                <div className="p-4 bg-slate-950/80 border border-amber-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>2. ТЕКУЩИЙ ОСТАТОК ДОЛГОВ</span>
+                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <p className="text-xl sm:text-2xl font-black font-mono text-amber-400">
+                    {debtStats.totalActiveDebtBalance.toLocaleString('ru-RU')} <span className="text-xs font-normal text-amber-300">{currencySymbol}</span>
+                  </p>
+                  <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                    <span>Активных должников:</span>
+                    <strong className="text-amber-400 font-bold">{debtStats.activeDebtsCount} чел.</strong>
+                  </div>
+                </div>
+
+                {/* Card 3: Overall Debt Issued */}
+                <div className="p-4 bg-slate-950/80 border border-blue-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl group-hover:bg-blue-500/10 transition-all pointer-events-none" />
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>3. ВСЕГО ВЫДАННО В ДОЛГ</span>
+                    <Receipt className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <p className="text-xl sm:text-2xl font-black font-mono text-blue-400">
+                    {debtStats.overallDebtIssued.toLocaleString('ru-RU')} <span className="text-xs font-normal text-blue-300">{currencySymbol}</span>
+                  </p>
+                  <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                    <span>Всего записей долга:</span>
+                    <strong className="text-blue-300 font-bold">{debtStats.totalDebtsCount} шт.</strong>
+                  </div>
+                </div>
+
+                {/* Card 4: Overall Repayment Rate */}
+                <div className="p-4 bg-slate-950/80 border border-purple-500/30 rounded-2xl space-y-1 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-xl group-hover:bg-purple-500/10 transition-all pointer-events-none" />
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                    <span>4. ВОЗВРАТ ДОЛГОВ (%)</span>
+                    <CheckCircle2 className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <p className="text-xl sm:text-2xl font-black font-mono text-purple-400">
+                    {debtStats.repaymentPercentage}%
+                  </p>
+                  <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                    <span>Закрыто долгов полностью:</span>
+                    <strong className="text-purple-300 font-bold">{debtStats.paidDebtsCount} шт.</strong>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* REPAYMENTS HISTORY TABLE */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <History className="w-5 h-5 text-amber-400" />
+                    <div>
+                      <h3 className="text-sm font-bold text-white tracking-tight">
+                        Детализация поступивших платежей в счет долга
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Список всех операций погашения за выбранный период
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Поиск по должнику или примечанию..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {filteredRepaymentsByPeriod.length === 0 ? (
+                  <div className="p-8 text-center space-y-2 bg-slate-900/50 rounded-xl border border-slate-800/80">
+                    <Coins className="w-10 h-10 text-slate-600 mx-auto" />
+                    <p className="text-sm font-bold text-slate-300">Погашений долгов за указанный период не найдено</p>
+                    <p className="text-xs text-slate-500">
+                      Попробуйте изменить выбранный период времени или сбросить поисковый фильтр
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="hidden md:grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-900/90 rounded-xl border border-slate-800">
+                      <div className="col-span-3 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-500" />
+                        <span>Дата и Время</span>
+                      </div>
+                      <div className="col-span-3 flex items-center gap-1">
+                        <User className="w-3 h-3 text-slate-500" />
+                        <span>Должник</span>
+                      </div>
+                      <div className="col-span-2 text-right">Сумма взноса</div>
+                      <div className="col-span-2 text-center">Статус долга</div>
+                      <div className="col-span-2">Примечание / Товар</div>
+                    </div>
+
+                    {filteredRepaymentsByPeriod.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-3 bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700 rounded-xl transition-all flex flex-col md:grid md:grid-cols-12 gap-2 text-xs items-start md:items-center"
+                      >
+                        <div className="md:col-span-3 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                          <span className="font-mono text-slate-300">
+                            {new Date(item.date).toLocaleDateString('ru-RU', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+
+                        <div className="md:col-span-3 font-bold text-white flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{item.debtorName}</span>
+                        </div>
+
+                        <div className="md:col-span-2 font-mono font-black text-emerald-400 md:text-right text-sm">
+                          +{item.amount.toLocaleString('ru-RU')} {currencySymbol}
+                        </div>
+
+                        <div className="md:col-span-2 text-center">
+                          {item.debtStatus === 'paid' ? (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Погашен
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              Частичный
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="md:col-span-2 text-slate-400 text-[11px] truncate">
+                          {item.note || item.productName || 'Погашение долга'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
         </div>
 
         {/* FOOTER */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-xs font-mono flex-shrink-0">
-          <span className="text-slate-400">
-            Итого за период: <strong className="text-emerald-400">{stats.totalRevenue.toLocaleString('ru-RU')} {currencySymbol}</strong> (Прибыль: <strong className="text-purple-400">+{stats.netProfit.toLocaleString('ru-RU')} {currencySymbol}</strong>)
-          </span>
+          {activeTab === 'sales' ? (
+            <span className="text-slate-400">
+              Итого за период: <strong className="text-emerald-400">{stats.totalRevenue.toLocaleString('ru-RU')} {currencySymbol}</strong> (Прибыль: <strong className="text-purple-400">+{stats.netProfit.toLocaleString('ru-RU')} {currencySymbol}</strong>)
+            </span>
+          ) : (
+            <span className="text-slate-400">
+              Погашено долгов за период: <strong className="text-emerald-400">{debtStats.totalCollectedInPeriod.toLocaleString('ru-RU')} {currencySymbol}</strong> (Активный остаток долгов: <strong className="text-amber-400">{debtStats.totalActiveDebtBalance.toLocaleString('ru-RU')} {currencySymbol}</strong>)
+            </span>
+          )}
 
           <button
             onClick={onClose}
