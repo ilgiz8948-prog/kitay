@@ -31,7 +31,7 @@ import {
   Unlock,
   ShieldCheck
 } from 'lucide-react';
-import { Product, ShipmentBatch, AppSettings, DebtRecord, DebtPayment } from './types';
+import { Product, ShipmentBatch, AppSettings, DebtRecord, DebtPayment, SaleRecord, SaleItemRecord } from './types';
 import { 
   db, 
   saveBatchToCloud, 
@@ -41,12 +41,16 @@ import {
   loadSettingsFromCloud,
   saveDebtToCloud,
   deleteDebtFromCloud,
-  loadDebtsFromCloud
+  loadDebtsFromCloud,
+  saveSaleToCloud,
+  deleteSaleFromCloud,
+  loadSalesFromCloud
 } from './firebase';
 import DebtsManager from './components/DebtsManager';
 import SoldProductsModal from './components/SoldProductsModal';
 import SellProductModal from './components/SellProductModal';
 import AnalyticsModal from './components/AnalyticsModal';
+import SalesAnalyticsModal from './components/SalesAnalyticsModal';
 
 // Helper to create a new empty batch
 const createNewBatch = (name: string, index: number, settings: AppSettings): ShipmentBatch => ({
@@ -178,6 +182,9 @@ export default function App() {
   // Debts State
   const [debts, setDebts] = useState<DebtRecord[]>([]);
 
+  // Sales History State
+  const [sales, setSales] = useState<SaleRecord[]>([]);
+
   // UI Navigation / State
   const [activeTab, setActiveTab] = useState<'calc' | 'shipments' | 'debts' | 'settings'>('calc');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -186,6 +193,7 @@ export default function App() {
   const [showSoldProductsModal, setShowSoldProductsModal] = useState<boolean>(false);
   const [showSellProductModal, setShowSellProductModal] = useState<boolean>(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState<boolean>(false);
+  const [showSalesAnalyticsModal, setShowSalesAnalyticsModal] = useState<boolean>(false);
   const [previewProductPhotoUrl, setPreviewProductPhotoUrl] = useState<string | null>(null);
 
   // Protected Product / Actions authorization state
@@ -318,6 +326,9 @@ export default function App() {
     const localDebts = getLocal<DebtRecord[]>('sinocalc_debts_local', sampleDebts);
     setDebts(localDebts);
 
+    const localSales = getLocal<SaleRecord[]>('sinocalc_sales_local', []);
+    setSales(localSales);
+
     // STEP B: Fetch from cloud with strict 1.2s timeout
     try {
       const cloudBatches = await withTimeout(loadBatchesFromCloud(), 1200);
@@ -342,6 +353,16 @@ export default function App() {
     } catch (err) {
       console.warn('Debts cloud load timed out or failed:', err);
       hasCloudError = true;
+    }
+
+    try {
+      const cloudSales = await withTimeout(loadSalesFromCloud(), 1200);
+      if (cloudSales && cloudSales.length > 0) {
+        setSales(cloudSales as SaleRecord[]);
+        saveLocal('sinocalc_sales_local', cloudSales);
+      }
+    } catch (err) {
+      console.warn('Sales cloud load timed out or failed:', err);
     }
 
     setSyncStatus(hasCloudError ? 'error' : 'synced');
@@ -480,6 +501,17 @@ export default function App() {
     setActiveTab('debts');
   };
 
+  const handleDeleteSale = async (saleId: string) => {
+    const updatedSales = sales.filter(s => s.id !== saleId);
+    setSales(updatedSales);
+    saveLocal('sinocalc_sales_local', updatedSales);
+    try {
+      await deleteSaleFromCloud(saleId);
+    } catch (err) {
+      console.error('Failed to delete sale from cloud:', err);
+    }
+  };
+
   const handleCompleteSale = async (saleData: {
     productId: string;
     productName: string;
@@ -502,6 +534,96 @@ export default function App() {
       totalAmount: number;
     }>;
   }) => {
+    // 1. Calculate sale items with landed costs for sales analytics
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+
+    const saleItems: SaleItemRecord[] = (saleData.items && saleData.items.length > 0)
+      ? saleData.items.map(item => {
+          const foundProduct = activeBatch?.products.find(p => p.id === item.productId);
+          let landedUnitCost = 0;
+          if (foundProduct && activeBatch) {
+            const qty = foundProduct.quantity || 1;
+            const posCNY = (foundProduct.priceCNY || 0) * qty;
+            const cnyToUSD = activeBatch.currencyRateCNYtoUSD || 0.14;
+            const cnyToKGS = activeBatch.currencyRateCNYtoKGS || 12.2;
+            const usdToKGS = activeBatch.currencyRateUSDtoKGS || 87.0;
+
+            let posPurchase = activeBatch.targetCurrency === 'KGS' ? posCNY * cnyToKGS : posCNY * cnyToUSD;
+            
+            let posDelivery = 0;
+            const delCurrency = foundProduct.deliveryCurrency || (foundProduct.deliveryMode === 'weight' ? 'USD' : activeBatch.targetCurrency);
+            let valInTarget = 0;
+            if (activeBatch.targetCurrency === 'KGS') {
+              valInTarget = delCurrency === 'USD' ? (foundProduct.deliveryValue || 0) * usdToKGS : (foundProduct.deliveryValue || 0);
+            } else {
+              valInTarget = delCurrency === 'KGS' ? (usdToKGS > 0 ? (foundProduct.deliveryValue || 0) / usdToKGS : 0) : (foundProduct.deliveryValue || 0);
+            }
+
+            if (foundProduct.deliveryMode === 'flat') posDelivery = qty * valInTarget;
+            else if (foundProduct.deliveryMode === 'total') posDelivery = valInTarget;
+            else if (foundProduct.deliveryMode === 'weight') posDelivery = (qty * (foundProduct.weight || 0)) * valInTarget;
+
+            landedUnitCost = qty > 0 ? Math.round((posPurchase + posDelivery) / qty) : 0;
+          }
+
+          const totalLandedCost = item.quantity * landedUnitCost;
+          const profit = item.totalAmount - totalLandedCost;
+
+          return {
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            priceType: item.priceType,
+            unitPrice: item.unitPrice,
+            landedUnitCost,
+            totalAmount: item.totalAmount,
+            totalLandedCost,
+            profit
+          };
+        })
+      : [{
+          productId: saleData.productId,
+          productName: saleData.productName,
+          quantity: saleData.quantity,
+          priceType: saleData.priceType,
+          unitPrice: saleData.unitPrice,
+          landedUnitCost: 0,
+          totalAmount: saleData.totalAmount,
+          totalLandedCost: 0,
+          profit: saleData.totalAmount
+        }];
+
+    let totalCogs = 0;
+    saleItems.forEach(i => { totalCogs += i.totalLandedCost; });
+    const netProfit = saleData.totalAmount - totalCogs;
+
+    const newSaleRecord: SaleRecord = {
+      id: `sale-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: now.toISOString(),
+      dateStr,
+      batchId: activeBatch?.id,
+      batchName: activeBatch?.name || 'Китай',
+      items: saleItems,
+      totalRevenue: saleData.totalAmount,
+      totalCogs,
+      netProfit,
+      currency: activeBatch?.targetCurrency || 'KGS',
+      isDebt: saleData.isDebt,
+      debtorName: saleData.debtorName,
+      initialPayment: saleData.initialPayment
+    };
+
+    const updatedSalesList = [newSaleRecord, ...sales];
+    setSales(updatedSalesList);
+    saveLocal('sinocalc_sales_local', updatedSalesList);
+    try {
+      await saveSaleToCloud(newSaleRecord);
+    } catch (e) {
+      console.warn('Failed to save sale to cloud:', e);
+    }
+
+    // 2. Deduct stock if requested
     if (saleData.deductStock && activeBatch) {
       const qtyMap = new Map<string, number>();
       if (saleData.items && saleData.items.length > 0) {
@@ -530,6 +652,7 @@ export default function App() {
       triggerBatchCloudSave(updatedBatch);
     }
 
+    // 3. Record debt if sale was on debt
     if (saleData.isDebt && saleData.debtorName) {
       const debtProductName = saleData.items && saleData.items.length > 0
         ? saleData.items.map(i => `${i.productName} (${i.quantity} шт, ${i.priceType === 'wholesale' ? 'Опт' : 'Розница'})`).join(', ')
@@ -1465,6 +1588,14 @@ export default function App() {
               <span>Продажа</span>
             </button>
             <button
+              onClick={() => setShowSalesAnalyticsModal(true)}
+              className="px-3.5 py-1.5 bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 font-bold rounded-lg text-xs uppercase tracking-wide flex items-center gap-1.5 transition-all border border-emerald-800/80 shadow mr-1"
+              title="Аналитика продаж (Выручка, Прибыль, Себестоимость)"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Аналитика продаж</span>
+            </button>
+            <button
               onClick={() => setActiveTab('calc')}
               className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide uppercase transition-all ${
                 activeTab === 'calc' 
@@ -1564,6 +1695,15 @@ export default function App() {
             <span className="flex items-center gap-2">
               <ShoppingBag className="w-4 h-4" />
               <span>🛒 Окно Продажи (Опт / Розница)</span>
+            </span>
+          </button>
+          <button
+            onClick={() => { setShowSalesAnalyticsModal(true); setIsMobileMenuOpen(false); }}
+            className="w-full py-3 px-4 rounded-xl text-left text-sm font-bold flex items-center justify-between bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 shadow-lg"
+          >
+            <span className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <span>📈 Аналитика Продаж (Выручка/Прибыль)</span>
             </span>
           </button>
           <button
@@ -3065,6 +3205,16 @@ export default function App() {
         batches={batches}
         debts={debts}
         activeBatchId={activeBatchId}
+      />
+
+      {/* 7.5 SALES ANALYTICS MODAL */}
+      <SalesAnalyticsModal
+        isOpen={showSalesAnalyticsModal}
+        onClose={() => setShowSalesAnalyticsModal(false)}
+        sales={sales}
+        currencySymbol={calculations.currencySymbol}
+        targetCurrency={activeBatch?.targetCurrency || 'KGS'}
+        onDeleteSale={handleDeleteSale}
       />
 
       {/* 7. PRODUCT PHOTO PREVIEW LIGHTBOX MODAL */}

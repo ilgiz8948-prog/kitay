@@ -63,3 +63,31 @@ export interface DebtRecord {
   debtorPhotoUrl?: string;    // Фото должника (URL или base64)
   payments: DebtPayment[];    // История выплат
 }
+
+export interface SaleItemRecord {
+  productId: string;
+  productName: string;
+  quantity: number;
+  priceType: 'wholesale' | 'retail';
+  unitPrice: number;
+  landedUnitCost: number;
+  totalAmount: number;
+  totalLandedCost: number;
+  profit: number;
+}
+
+export interface SaleRecord {
+  id: string;
+  timestamp: string;          // ISO String e.g. 2026-08-03T18:00:00.000Z
+  dateStr: string;            // YYYY-MM-DD
+  batchId?: string;
+  batchName?: string;
+  items: SaleItemRecord[];
+  totalRevenue: number;       // Общая выручка
+  totalCogs: number;          // Себестоимость проданного товара
+  netProfit: number;          // Чистая прибыль
+  currency: 'KGS' | 'USD';    // Валюта продажи
+  isDebt: boolean;            // В долг или за наличные
+  debtorName?: string;        // Покупатель при продаже в долг
+  initialPayment?: number;    // Первый взнос
+}

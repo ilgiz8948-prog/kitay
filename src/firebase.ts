@@ -112,3 +112,41 @@ export async function loadDebtsFromCloud() {
   }
 }
 
+// Helper to save a single sale record to Firestore
+export async function saveSaleToCloud(sale: any) {
+  try {
+    const docRef = doc(db, 'sales', sale.id);
+    await setDoc(docRef, sale);
+  } catch (error) {
+    console.error('Error saving sale to cloud:', error);
+    throw error;
+  }
+}
+
+// Helper to delete a sale record from Firestore
+export async function deleteSaleFromCloud(saleId: string) {
+  try {
+    const docRef = doc(db, 'sales', saleId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Error deleting sale from cloud:', error);
+    throw error;
+  }
+}
+
+// Helper to load all sales from Firestore
+export async function loadSalesFromCloud() {
+  try {
+    const colRef = collection(db, 'sales');
+    const snapshot = await getDocs(colRef);
+    const sales: any[] = [];
+    snapshot.forEach(docSnap => {
+      sales.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    return sales;
+  } catch (error: any) {
+    console.warn('Unable to load sales from cloud (offline mode active):', error?.message || error);
+    return null;
+  }
+}
+
