@@ -1491,11 +1491,11 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-slate-200 font-sans">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-white text-xl shadow-lg shadow-blue-500/20 animate-pulse">
-            S
+            Б
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
-            <span>Подключение к облаку SinoCalc...</span>
+            <span>Подключение к облаку БИЗНЕС СКЛАД...</span>
           </div>
         </div>
       </div>
@@ -1514,10 +1514,10 @@ export default function App() {
         <div className="w-full max-w-md bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl shadow-blue-900/15 transition-all">
           <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-white text-2xl shadow-lg shadow-blue-500/25 mb-4">
-              S
+              Б
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-white mb-1">
-              SinoCalc <span className="text-blue-500 font-normal">Cloud</span>
+              БИЗНЕС <span className="text-blue-500 font-normal">СКЛАД</span>
             </h1>
             <p className="text-slate-400 text-xs text-center px-4 leading-relaxed mt-1">
               Учет и калькуляция товаров из Китая. Данные синхронизированы для ноутбука и телефона.
@@ -1577,10 +1577,10 @@ export default function App() {
       {/* 1. HEADER */}
       <header className="h-16 border-b border-slate-800 bg-slate-900/75 backdrop-blur-md flex items-center justify-between px-4 sm:px-8 flex-shrink-0 sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/15">S</div>
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/15">Б</div>
           <div>
             <h1 className="text-base sm:text-lg font-semibold tracking-tight text-white flex items-center gap-1.5">
-              SinoCalc <span className="text-blue-500 font-normal">Pro</span>
+              БИЗНЕС <span className="text-blue-500 font-normal">СКЛАД</span>
             </h1>
             <p className="text-[9px] text-slate-500 tracking-wider uppercase font-bold -mt-0.5 hidden sm:block">
               Учет поставок из Китая • сом & $
@@ -3205,7 +3205,7 @@ export default function App() {
 
             <div className="text-xs text-slate-300 space-y-3.5 leading-relaxed">
               <p>
-                <strong>SinoCalc Pro</strong> использует формулу <span className="text-blue-400">Landed Cost</span> (конечная цена товара на складе) для выявления чистой прибыли.
+                <strong>БИЗНЕС СКЛАД</strong> использует формулу <span className="text-blue-400">Landed Cost</span> (конечная цена товара на складе) для выявления чистой прибыли.
               </p>
               
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/60 font-mono space-y-2 text-[11px]">
@@ -3302,7 +3302,7 @@ export default function App() {
         onClose={() => setShowReceiptModal(false)}
         sale={selectedReceiptSale}
         currencySymbol={calculations?.currencySymbol || (activeBatch?.targetCurrency === 'USD' ? '$' : 'сом')}
-        storeName={activeBatch?.name ? `SinoCalc (${activeBatch.name})` : 'SinoCalc Commerce'}
+        storeName={activeBatch?.name ? `БИЗНЕС СКЛАД (${activeBatch.name})` : 'БИЗНЕС СКЛАД'}
       />
 
       {/* 7. PRODUCT PHOTO PREVIEW LIGHTBOX MODAL */}

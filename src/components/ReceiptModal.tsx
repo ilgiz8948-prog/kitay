@@ -31,7 +31,7 @@ export default function ReceiptModal({
   onClose,
   sale,
   currencySymbol,
-  storeName = 'SinoCalc Commerce',
+  storeName = 'БИЗНЕС СКЛАД',
   sellerPhone = '+996 ___ ___ ___'
 }: ReceiptModalProps) {
   const [copiedText, setCopiedText] = useState(false);
