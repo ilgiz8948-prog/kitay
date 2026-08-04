@@ -231,7 +231,7 @@ export default function App() {
   const saveTimeoutRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   // Timeout wrapper for cloud operations
-  const withTimeout = <T,>(promise: Promise<T>, ms = 1200): Promise<T> => {
+  const withTimeout = <T,>(promise: Promise<T>, ms = 8000): Promise<T> => {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Cloud operation timed out after ${ms}ms`));
@@ -283,9 +283,9 @@ export default function App() {
         // 3. Close full-screen loader immediately
         setIsInitializing(false);
 
-        // 4. Try cloud settings in background with strict 1.2s timeout
+        // 4. Try cloud settings in background
         try {
-          const cloudSettings = await withTimeout(loadSettingsFromCloud(), 1200);
+          const cloudSettings = await withTimeout(loadSettingsFromCloud(), 8000);
           if (cloudSettings) {
             setSettings(cloudSettings as AppSettings);
             saveLocal('sinocalc_settings_local', cloudSettings);
@@ -333,15 +333,19 @@ export default function App() {
     const localSales = getLocal<SaleRecord[]>('sinocalc_sales_local', []);
     setSales(localSales);
 
-    // STEP B: Fetch from cloud with strict 1.2s timeout
+    // STEP B: Fetch from cloud with generous 8s timeout
     try {
-      const cloudBatches = await withTimeout(loadBatchesFromCloud(), 1200);
-      if (cloudBatches && cloudBatches.length > 0) {
-        setBatches(cloudBatches as ShipmentBatch[]);
-        saveLocal('sinocalc_batches_local', cloudBatches);
-        const savedActiveId = localStorage.getItem('sinocalc_active_id');
-        const exists = cloudBatches.some(b => b.id === savedActiveId);
-        setActiveBatchId(exists && savedActiveId ? savedActiveId : cloudBatches[0].id);
+      const cloudBatches = await withTimeout(loadBatchesFromCloud(), 8000);
+      if (cloudBatches !== null) {
+        if (cloudBatches.length > 0) {
+          setBatches(cloudBatches as ShipmentBatch[]);
+          saveLocal('sinocalc_batches_local', cloudBatches);
+          const savedActiveId = localStorage.getItem('sinocalc_active_id');
+          const exists = cloudBatches.some(b => b.id === savedActiveId);
+          setActiveBatchId(exists && savedActiveId ? savedActiveId : cloudBatches[0].id);
+        }
+      } else {
+        hasCloudError = true;
       }
     } catch (err) {
       console.warn('Batches cloud load timed out or failed:', err);
@@ -349,10 +353,12 @@ export default function App() {
     }
 
     try {
-      const cloudDebts = await withTimeout(loadDebtsFromCloud(), 1200);
-      if (cloudDebts && cloudDebts.length > 0) {
+      const cloudDebts = await withTimeout(loadDebtsFromCloud(), 8000);
+      if (cloudDebts !== null) {
         setDebts(cloudDebts as DebtRecord[]);
         saveLocal('sinocalc_debts_local', cloudDebts);
+      } else {
+        hasCloudError = true;
       }
     } catch (err) {
       console.warn('Debts cloud load timed out or failed:', err);
@@ -360,8 +366,8 @@ export default function App() {
     }
 
     try {
-      const cloudSales = await withTimeout(loadSalesFromCloud(), 1200);
-      if (cloudSales && cloudSales.length > 0) {
+      const cloudSales = await withTimeout(loadSalesFromCloud(), 8000);
+      if (cloudSales !== null) {
         setSales(cloudSales as SaleRecord[]);
         saveLocal('sinocalc_sales_local', cloudSales);
       }
@@ -1335,6 +1341,7 @@ export default function App() {
 
   // Manual trigger to pull fresh data from cloud
   const handleRefreshData = async () => {
+    setSyncStatus('saving');
     await loadAllBatches();
   };
 
