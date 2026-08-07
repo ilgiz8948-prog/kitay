@@ -45,7 +45,11 @@ import {
   saveSaleToCloud,
   deleteSaleFromCloud,
   loadSalesFromCloud,
-  clearAllCloudData
+  clearAllCloudData,
+  subscribeToBatchesFromCloud,
+  subscribeToDebtsFromCloud,
+  subscribeToSalesFromCloud,
+  subscribeToSettingsFromCloud
 } from './firebase';
 import DebtsManager from './components/DebtsManager';
 import SoldProductsModal from './components/SoldProductsModal';
@@ -306,6 +310,64 @@ export default function App() {
     }
     initApp();
   }, []);
+
+  // Real-time multi-device Firestore synchronization
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const unsubBatches = subscribeToBatchesFromCloud(
+      (cloudBatches) => {
+        if (cloudBatches && cloudBatches.length > 0) {
+          setBatches(cloudBatches as ShipmentBatch[]);
+          saveLocal('sinocalc_batches_local', cloudBatches);
+          setActiveBatchId(prevId => {
+            const exists = cloudBatches.some((b: any) => b.id === prevId);
+            return exists && prevId ? prevId : cloudBatches[0].id;
+          });
+        }
+        setSyncStatus('synced');
+      },
+      () => setSyncStatus('error')
+    );
+
+    const unsubDebts = subscribeToDebtsFromCloud(
+      (cloudDebts) => {
+        if (cloudDebts) {
+          setDebts(cloudDebts as DebtRecord[]);
+          saveLocal('sinocalc_debts_local', cloudDebts);
+        }
+        setSyncStatus('synced');
+      },
+      () => setSyncStatus('error')
+    );
+
+    const unsubSales = subscribeToSalesFromCloud(
+      (cloudSales) => {
+        if (cloudSales) {
+          setSales(cloudSales as SaleRecord[]);
+          saveLocal('sinocalc_sales_local', cloudSales);
+        }
+        setSyncStatus('synced');
+      },
+      () => setSyncStatus('error')
+    );
+
+    const unsubSettings = subscribeToSettingsFromCloud(
+      (cloudSettings) => {
+        if (cloudSettings) {
+          setSettings(cloudSettings as AppSettings);
+          saveLocal('sinocalc_settings_local', cloudSettings);
+        }
+      }
+    );
+
+    return () => {
+      unsubBatches();
+      unsubDebts();
+      unsubSales();
+      unsubSettings();
+    };
+  }, [isAuthenticated]);
 
   // Load batches and debts once authenticated
   const loadAllData = async () => {

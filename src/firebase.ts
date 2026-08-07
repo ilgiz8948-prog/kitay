@@ -1,5 +1,14 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  getDocs, 
+  deleteDoc,
+  onSnapshot 
+} from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase
@@ -13,6 +22,67 @@ const db = initializeFirestore(
 );
 
 export { db };
+
+// Real-time subscription helpers
+export function subscribeToBatchesFromCloud(onData: (batches: any[]) => void, onError?: (err: any) => void) {
+  const colRef = collection(db, 'batches');
+  return onSnapshot(colRef, (snapshot) => {
+    const batches: any[] = [];
+    snapshot.forEach(docSnap => {
+      batches.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    onData(batches);
+  }, (error) => {
+    console.warn('Unable to subscribe to batches from cloud:', error?.message || error);
+    if (onError) onError(error);
+  });
+}
+
+export function subscribeToDebtsFromCloud(onData: (debts: any[]) => void, onError?: (err: any) => void) {
+  const colRef = collection(db, 'debts');
+  return onSnapshot(colRef, (snapshot) => {
+    const debts: any[] = [];
+    snapshot.forEach(docSnap => {
+      debts.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    onData(debts);
+  }, (error) => {
+    console.warn('Unable to subscribe to debts from cloud:', error?.message || error);
+    if (onError) onError(error);
+  });
+}
+
+export function subscribeToSalesFromCloud(onData: (sales: any[]) => void, onError?: (err: any) => void) {
+  const colRef = collection(db, 'sales');
+  return onSnapshot(colRef, (snapshot) => {
+    const sales: any[] = [];
+    snapshot.forEach(docSnap => {
+      sales.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    // Sort descending by timestamp
+    sales.sort((a, b) => {
+      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return timeB - timeA;
+    });
+    onData(sales);
+  }, (error) => {
+    console.warn('Unable to subscribe to sales from cloud:', error?.message || error);
+    if (onError) onError(error);
+  });
+}
+
+export function subscribeToSettingsFromCloud(onData: (settings: any) => void, onError?: (err: any) => void) {
+  const docRef = doc(db, 'app', 'settings');
+  return onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      onData(docSnap.data());
+    }
+  }, (error) => {
+    console.warn('Unable to subscribe to settings from cloud:', error?.message || error);
+    if (onError) onError(error);
+  });
+}
 
 // Helper to save a single batch to Firestore
 export async function saveBatchToCloud(batch: any) {
