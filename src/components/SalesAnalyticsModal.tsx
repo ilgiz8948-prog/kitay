@@ -50,13 +50,32 @@ type DebtSubTab = 'products' | 'debtors' | 'repayments';
 // Safe date helpers to prevent RangeError / invalid date crashes
 const safeGetDateStr = (dateVal: any): string => {
   if (!dateVal) return new Date().toISOString().split('T')[0];
-  try {
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
-    return d.toISOString().split('T')[0];
-  } catch {
-    return new Date().toISOString().split('T')[0];
+  if (typeof dateVal === 'number') {
+    try {
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    } catch {}
   }
+  if (typeof dateVal === 'string') {
+    const trimmed = dateVal.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      return trimmed.substring(0, 10);
+    }
+    if (/^\d{1,2}\.\d{1,2}\.\d{4}/.test(trimmed)) {
+      const parts = trimmed.split(' ')[0].split('.');
+      if (parts.length === 3) {
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2];
+        return `${year}-${month}-${day}`;
+      }
+    }
+    try {
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    } catch {}
+  }
+  return new Date().toISOString().split('T')[0];
 };
 
 const safeFormatLabel = (dateStr: string): string => {
@@ -668,10 +687,10 @@ export default function SalesAnalyticsModal({
     return salesList.filter(s => {
       if (!s) return false;
       // Date filter
-      const saleDateStr = s.dateStr || (s.timestamp ? safeGetDateStr(s.timestamp) : '');
+      const saleDateStr = safeGetDateStr(s.dateStr || s.timestamp);
       let saleDateObj: Date;
       try {
-        saleDateObj = s.timestamp ? new Date(s.timestamp) : new Date(saleDateStr);
+        saleDateObj = s.timestamp ? new Date(s.timestamp) : new Date(saleDateStr + 'T00:00:00');
         if (isNaN(saleDateObj.getTime())) saleDateObj = new Date();
       } catch {
         saleDateObj = new Date();
@@ -682,9 +701,11 @@ export default function SalesAnalyticsModal({
       } else if (period === 'yesterday') {
         if (saleDateStr !== yesterdayStr) return false;
       } else if (period === '7days') {
-        if (saleDateObj < sevenDaysAgo) return false;
+        const sevenDaysAgoStr = safeGetDateStr(sevenDaysAgo);
+        if (saleDateStr < sevenDaysAgoStr && saleDateObj < sevenDaysAgo) return false;
       } else if (period === '30days') {
-        if (saleDateObj < thirtyDaysAgo) return false;
+        const thirtyDaysAgoStr = safeGetDateStr(thirtyDaysAgo);
+        if (saleDateStr < thirtyDaysAgoStr && saleDateObj < thirtyDaysAgo) return false;
       } else if (period === 'custom') {
         if (customStartDate && saleDateStr < customStartDate) return false;
         if (customEndDate && saleDateStr > customEndDate) return false;
