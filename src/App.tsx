@@ -344,8 +344,24 @@ export default function App() {
     const unsubSales = subscribeToSalesFromCloud(
       (cloudSales) => {
         if (cloudSales) {
-          setSales(cloudSales as SaleRecord[]);
-          saveLocal('sinocalc_sales_local', cloudSales);
+          const localSales = getLocal<SaleRecord[]>('sinocalc_sales_local', []);
+          const cloudIds = new Set(cloudSales.map((s: any) => s.id));
+          const missingLocalSales = localSales.filter(s => s && s.id && !cloudIds.has(s.id));
+
+          if (missingLocalSales.length > 0) {
+            missingLocalSales.forEach(s => {
+              saveSaleToCloud(s).catch(e => console.warn('Syncing missing local sale failed:', e));
+            });
+          }
+
+          const merged = [...cloudSales, ...missingLocalSales].sort((a, b) => {
+            const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+            const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+            return timeB - timeA;
+          });
+
+          setSales(merged as SaleRecord[]);
+          saveLocal('sinocalc_sales_local', merged);
         }
         setSyncStatus('synced');
       },
@@ -430,8 +446,24 @@ export default function App() {
     try {
       const cloudSales = await withTimeout(loadSalesFromCloud(), 8000);
       if (cloudSales !== null) {
-        setSales(cloudSales as SaleRecord[]);
-        saveLocal('sinocalc_sales_local', cloudSales);
+        const localSales = getLocal<SaleRecord[]>('sinocalc_sales_local', []);
+        const cloudIds = new Set(cloudSales.map((s: any) => s.id));
+        const missingLocalSales = localSales.filter(s => s && s.id && !cloudIds.has(s.id));
+
+        if (missingLocalSales.length > 0) {
+          missingLocalSales.forEach(s => {
+            saveSaleToCloud(s).catch(e => console.warn('Syncing missing local sale failed:', e));
+          });
+        }
+
+        const merged = [...cloudSales, ...missingLocalSales].sort((a, b) => {
+          const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        setSales(merged as SaleRecord[]);
+        saveLocal('sinocalc_sales_local', merged);
       }
     } catch (err) {
       console.warn('Sales cloud load timed out or failed:', err);

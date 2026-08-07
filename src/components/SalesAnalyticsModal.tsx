@@ -353,8 +353,8 @@ export default function SalesAnalyticsModal({
 
       if (period === 'today') return dStr === todayStr;
       if (period === 'yesterday') return dStr === yesterdayStr;
-      if (period === '7days') return dObj >= sevenDaysAgo;
-      if (period === '30days') return dObj >= thirtyDaysAgo;
+      if (period === '7days') return dStr >= safeGetDateStr(sevenDaysAgo) || dObj >= sevenDaysAgo;
+      if (period === '30days') return dStr >= safeGetDateStr(thirtyDaysAgo) || dObj >= thirtyDaysAgo;
       if (period === 'custom') {
         if (customStartDate && dStr < customStartDate) return false;
         if (customEndDate && dStr > customEndDate) return false;
@@ -812,7 +812,7 @@ export default function SalesAnalyticsModal({
     }
 
     filteredSalesByPeriod.forEach(s => {
-      const dStr = s.dateStr || safeGetDateStr(s.timestamp);
+      const dStr = safeGetDateStr(s.dateStr || s.timestamp);
       if (!dStr) return;
       if (daysMap[dStr]) {
         daysMap[dStr].revenue += s.totalRevenue || 0;

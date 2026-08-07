@@ -88,7 +88,8 @@ export function subscribeToSettingsFromCloud(onData: (settings: any) => void, on
 export async function saveBatchToCloud(batch: any) {
   try {
     const docRef = doc(db, 'batches', batch.id);
-    await setDoc(docRef, batch);
+    const cleanData = JSON.parse(JSON.stringify(batch));
+    await setDoc(docRef, cleanData);
   } catch (error) {
     console.error('Error saving batch to cloud:', error);
     throw error;
@@ -126,7 +127,8 @@ export async function loadBatchesFromCloud() {
 export async function saveSettingsToCloud(settings: any) {
   try {
     const docRef = doc(db, 'app', 'settings');
-    await setDoc(docRef, settings);
+    const cleanData = JSON.parse(JSON.stringify(settings));
+    await setDoc(docRef, cleanData);
   } catch (error) {
     console.error('Error saving settings to cloud:', error);
     throw error;
@@ -152,7 +154,8 @@ export async function loadSettingsFromCloud() {
 export async function saveDebtToCloud(debt: any) {
   try {
     const docRef = doc(db, 'debts', debt.id);
-    await setDoc(docRef, debt);
+    const cleanData = JSON.parse(JSON.stringify(debt));
+    await setDoc(docRef, cleanData);
   } catch (error) {
     console.error('Error saving debt to cloud:', error);
     throw error;
@@ -190,7 +193,8 @@ export async function loadDebtsFromCloud() {
 export async function saveSaleToCloud(sale: any) {
   try {
     const docRef = doc(db, 'sales', sale.id);
-    await setDoc(docRef, sale);
+    const cleanData = JSON.parse(JSON.stringify(sale));
+    await setDoc(docRef, cleanData);
   } catch (error) {
     console.error('Error saving sale to cloud:', error);
     throw error;
