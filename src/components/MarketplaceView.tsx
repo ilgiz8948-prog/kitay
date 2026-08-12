@@ -28,6 +28,7 @@ import {
 import { Product, ShipmentBatch, MarketplaceOrder, PushNotification } from '../types';
 import StripeCheckoutModal from './StripeCheckoutModal';
 import BuyerCabinetModal from './BuyerCabinetModal';
+import { AmperbikeLogo } from './AmperbikeLogo';
 
 interface MarketplaceViewProps {
   batches: ShipmentBatch[];
@@ -215,46 +216,33 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950">
       {/* TOP MARKETPLACE HEADER */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-xl">
+      <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-emerald-950/80 shadow-2xl shadow-emerald-950/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
-          {/* Brand Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-              <ShoppingBag className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-black tracking-tight text-white">SINO MARKETPLACE</span>
-                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                  Витрина склада
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">Прямые поставки с бизнес-склада с доставкой и Stripe</p>
-            </div>
-          </div>
+          {/* Brand Logo with Amperbike */}
+          <AmperbikeLogo size="md" showText={true} />
 
           {/* Search bar */}
           <div className="flex-1 max-w-md relative min-w-[220px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            <Search className="w-4 h-4 text-emerald-400 absolute left-3 top-3" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск товаров на складе..."
-              className="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition-all"
+              placeholder="Поиск электротранспорта и товаров на складе..."
+              className="w-full bg-slate-900/90 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition-all"
             />
           </div>
 
           {/* Controls: Currency, Buyer Cabinet, Cart, Admin toggle */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Currency switcher */}
-            <div className="bg-slate-950 border border-slate-800 p-1 rounded-xl flex items-center">
+            <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex items-center">
               <button
                 onClick={() => setDisplayCurrency('KGS')}
                 className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                  displayCurrency === 'KGS' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  displayCurrency === 'KGS' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 сом
@@ -262,7 +250,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               <button
                 onClick={() => setDisplayCurrency('USD')}
                 className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                  displayCurrency === 'USD' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  displayCurrency === 'USD' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 $
@@ -272,12 +260,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             {/* Buyer Cabinet button */}
             <button
               onClick={() => setIsCabinetOpen(true)}
-              className="relative bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-2 transition-all"
+              className="relative bg-slate-900 border border-slate-800 hover:border-emerald-500/40 text-slate-200 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-2 transition-all group"
             >
-              <User className="w-4 h-4 text-indigo-400" />
+              <User className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
               <span className="hidden sm:inline">Личный кабинет</span>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold animate-pulse">
+                <span className="absolute -top-1 -right-1 bg-amber-400 text-slate-950 text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-extrabold animate-pulse">
                   {unreadCount}
                 </span>
               )}
@@ -286,12 +274,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             {/* Shopping Cart button */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg shadow-indigo-600/25 flex items-center gap-2 transition-all"
+              className="relative bg-gradient-to-r from-emerald-600 via-green-600 to-lime-600 hover:from-emerald-500 hover:to-lime-500 text-slate-950 text-xs font-extrabold px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/25 flex items-center gap-2 transition-all"
             >
-              <ShoppingCart className="w-4 h-4" />
+              <ShoppingCart className="w-4 h-4 text-slate-950" />
               <span>Корзина</span>
               {cartItemsCount > 0 && (
-                <span className="bg-white text-indigo-900 font-extrabold text-[11px] px-2 py-0.5 rounded-full ml-1">
+                <span className="bg-slate-950 text-amber-400 font-black text-[11px] px-2 py-0.5 rounded-full ml-1 border border-amber-400/30">
                   {cartItemsCount}
                 </span>
               )}
@@ -305,10 +293,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   setOwnerAuthError('');
                   setIsOwnerAuthOpen(true);
                 }}
-                className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-medium px-3 py-2 rounded-xl border border-slate-800 transition-all flex items-center gap-1.5"
+                className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-amber-300 text-xs font-medium px-3 py-2 rounded-xl border border-slate-800 transition-all flex items-center gap-1.5"
                 title="Вход для сотрудников и владельца склада"
               >
-                <Lock className="w-3.5 h-3.5 text-indigo-400" />
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
                 <span className="hidden sm:inline">Вход владельца</span>
               </button>
             )}
@@ -316,40 +304,46 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         </div>
       </header>
 
-      {/* HERO BANNER FOR CLIENTS */}
-      <section className="bg-gradient-to-r from-indigo-950 via-slate-900 to-purple-950 border-b border-slate-800/80 py-8 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+      {/* HERO BANNER FOR CLIENTS - AMPERBIKE GREEN & YELLOW LIGHTNING STYLING */}
+      <section className="relative overflow-hidden bg-gradient-to-r from-emerald-950 via-slate-950 to-green-950 border-b border-emerald-900/40 py-8 px-4 sm:px-6">
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-10 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
           <div className="space-y-3 max-w-2xl text-center md:text-left">
-            <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full text-xs font-semibold text-indigo-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Официальный каталог склада
+            <div className="inline-flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 px-3.5 py-1 rounded-full text-xs font-bold text-emerald-300">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Amperbike.kg — Прямые импортные поставки
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Товары в наличии с прямой доставкой и отслеживанием
+              Электротранспорт и качественные товары в наличии в Бишкеке
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300">
-              Заказывайте качественные импортные товары напрямую с нашего склада. Безопасная онлайн-оплата карт Stripe, мгновенное отслеживание статуса посылки как на Wildberries!
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Официальный каталог Amperbike.kg с прямой гарантией склада. Безопасная онлайн-оплата карт Stripe, экспресс-выдача в ПВЗ по QR-коду и быстрая курьерская доставка.
             </p>
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-1 text-xs text-slate-400">
-              <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
-                <ShieldCheck className="w-4 h-4" /> Безопасный Stripe
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-1 text-xs text-slate-300">
+              <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" /> Гарантия качества
               </span>
-              <span className="flex items-center gap-1.5 text-indigo-300 font-medium">
-                <Truck className="w-4 h-4" /> Быстрая доставка в ПВЗ
+              <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                <Truck className="w-4 h-4 text-amber-400" /> Быстрая доставка в ПВЗ
               </span>
-              <span className="flex items-center gap-1.5 text-purple-300 font-medium">
-                <QrCode className="w-4 h-4" /> Выдача по QR-коду
+              <span className="flex items-center gap-1.5 text-lime-400 font-semibold">
+                <QrCode className="w-4 h-4 text-lime-400" /> Выдача по QR-коду
               </span>
             </div>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl flex items-center gap-4 shadow-xl shrink-0">
-            <div className="w-12 h-12 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300">
+          <div className="bg-slate-900/90 border border-emerald-500/30 p-4 rounded-2xl flex items-center gap-4 shadow-2xl shadow-emerald-950/50 shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
               <MapPin className="w-6 h-6" />
             </div>
             <div className="text-xs">
-              <p className="text-slate-400">Главный пункт выдачи (ПВЗ):</p>
+              <p className="text-slate-400">Пункт выдачи Amperbike (ПВЗ):</p>
               <p className="font-bold text-white text-sm">г. Бишкек, ул. Чуй 128 (ЦУМ)</p>
-              <p className="text-emerald-400 text-[11px] font-medium">Работаем ежедневно 09:00 - 21:00</p>
+              <p className="text-emerald-400 text-[11px] font-semibold flex items-center gap-1 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                Работаем ежедневно 09:00 - 21:00
+              </p>
             </div>
           </div>
         </div>
@@ -362,7 +356,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           onClick={() => setSelectedBatchId('all')}
           className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
             selectedBatchId === 'all'
-              ? 'bg-indigo-600 text-white shadow-md'
+              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
               : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
           }`}
         >
@@ -374,7 +368,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             onClick={() => setSelectedBatchId(b.id)}
             className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
               selectedBatchId === b.id
-                ? 'bg-indigo-600 text-white shadow-md'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
                 : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
@@ -440,7 +434,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     <div>
                       <h3
                         onClick={() => setViewingProduct({ product, batchName })}
-                        className="text-sm font-bold text-white hover:text-indigo-400 cursor-pointer transition-colors line-clamp-2"
+                        className="text-sm font-bold text-white hover:text-emerald-400 cursor-pointer transition-colors line-clamp-2"
                       >
                         {product.name}
                       </h3>
@@ -452,16 +446,16 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                       <div>
                         <p className="text-[10px] text-slate-400">Розничная цена</p>
                         <p className="text-base font-extrabold text-white">
-                          {displayPrice.toLocaleString('ru-RU')} <span className="text-indigo-400 text-xs">{symbol}</span>
+                          {displayPrice.toLocaleString('ru-RU')} <span className="text-emerald-400 text-xs font-bold">{symbol}</span>
                         </p>
                       </div>
 
                       <button
                         onClick={() => addToCart(product, batchName)}
                         disabled={!isAvailable}
-                        className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold p-2.5 rounded-xl shadow-md shadow-indigo-600/30 flex items-center gap-1.5 transition-all text-xs shrink-0"
+                        className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-40 text-slate-950 font-extrabold p-2.5 rounded-xl shadow-md shadow-emerald-600/30 flex items-center gap-1.5 transition-all text-xs shrink-0"
                       >
-                        <ShoppingCart className="w-4 h-4" />
+                        <ShoppingCart className="w-4 h-4 text-slate-950" />
                         <span>Купить</span>
                       </button>
                     </div>
@@ -475,12 +469,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
       {/* SHOPPING CART SLIDE-OVER MODAL */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border-l border-slate-800 text-white w-full max-w-md h-full flex flex-col shadow-2xl overflow-hidden">
             {/* Header */}
             <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950">
               <div className="flex items-center gap-2.5">
-                <ShoppingCart className="w-5 h-5 text-indigo-400" />
+                <ShoppingCart className="w-5 h-5 text-emerald-400" />
                 <h3 className="text-base font-bold text-white">Оформление заказа</h3>
               </div>
               <button onClick={() => setIsCartOpen(false)} className="text-slate-400 hover:text-white p-1">
@@ -492,7 +486,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {cart.length === 0 ? (
                 <div className="text-center py-16 text-slate-500 space-y-2">
-                  <ShoppingBag className="w-12 h-12 mx-auto opacity-30" />
+                  <ShoppingBag className="w-12 h-12 mx-auto opacity-30 text-emerald-500" />
                   <p className="text-sm">Ваша корзина пуста</p>
                 </div>
               ) : (
@@ -513,7 +507,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                           )}
                           <div className="flex-1 min-w-0">
                             <h4 className="text-xs font-semibold text-white truncate">{item.product.name}</h4>
-                            <p className="text-xs font-bold text-indigo-300 mt-0.5">
+                            <p className="text-xs font-bold text-emerald-400 mt-0.5">
                               {itemPrice.toLocaleString()} {symbol}
                             </p>
                           </div>
@@ -539,7 +533,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                   {/* Customer Information Form */}
                   <div className="pt-4 border-t border-slate-800 space-y-3">
-                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Данные покупателя</h4>
+                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Данные покупателя</h4>
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">ФИО Получателя *</label>
                       <input
@@ -547,7 +541,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         value={buyerName}
                         onChange={(e) => setBuyerName(e.target.value)}
                         placeholder="Иван Иванов"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                     <div>
@@ -557,7 +551,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         value={buyerPhone}
                         onChange={(e) => setBuyerPhone(e.target.value)}
                         placeholder="+996 555 123456"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                       />
                     </div>
 
@@ -570,7 +564,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                           onClick={() => setDeliveryType('pickup_point')}
                           className={`p-2.5 rounded-lg border text-xs font-semibold text-center transition-all ${
                             deliveryType === 'pickup_point'
-                              ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                               : 'bg-slate-950 border-slate-800 text-slate-400'
                           }`}
                         >
@@ -581,7 +575,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                           onClick={() => setDeliveryType('courier')}
                           className={`p-2.5 rounded-lg border text-xs font-semibold text-center transition-all ${
                             deliveryType === 'courier'
-                              ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                               : 'bg-slate-950 border-slate-800 text-slate-400'
                           }`}
                         >
@@ -596,7 +590,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         <select
                           value={pickupPointName}
                           onChange={(e) => setPickupPointName(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                         >
                           <option value="ПВЗ Бишкек - ул. Чуй 128 (ЦУМ)">ПВЗ Бишкек - ул. Чуй 128 (ЦУМ)</option>
                           <option value="ПВЗ Бишкек - Рынок Дордой, проход 15">ПВЗ Бишкек - Рынок Дордой, проход 15</option>
@@ -611,7 +605,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                           value={deliveryAddress}
                           onChange={(e) => setDeliveryAddress(e.target.value)}
                           placeholder="г. Бишкек, ул. Киевская 42, кв 10"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                         />
                       </div>
                     )}
@@ -620,18 +614,18 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     <div className="pt-2">
                       <label className="block text-[11px] text-slate-400 mb-1">Способ оплаты</label>
                       <div className="space-y-2">
-                        <label className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer hover:border-indigo-500/50">
+                        <label className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer hover:border-emerald-500/50">
                           <div className="flex items-center gap-2.5">
                             <input
                               type="radio"
                               name="payment"
                               checked={paymentMethod === 'stripe'}
                               onChange={() => setPaymentMethod('stripe')}
-                              className="accent-indigo-500"
+                              className="accent-emerald-500"
                             />
                             <div>
                               <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                                <CreditCard className="w-3.5 h-3.5 text-indigo-400" /> Stripe Card (Карта онлайн)
+                                <CreditCard className="w-3.5 h-3.5 text-emerald-400" /> Stripe Card (Карта онлайн)
                               </p>
                               <p className="text-[10px] text-slate-400">Безопасный расчет 256-bit SSL</p>
                             </div>
@@ -641,14 +635,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                           </span>
                         </label>
 
-                        <label className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer hover:border-indigo-500/50">
+                        <label className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer hover:border-emerald-500/50">
                           <div className="flex items-center gap-2.5">
                             <input
                               type="radio"
                               name="payment"
                               checked={paymentMethod === 'cash_on_delivery'}
                               onChange={() => setPaymentMethod('cash_on_delivery')}
-                              className="accent-indigo-500"
+                              className="accent-emerald-500"
                             />
                             <div>
                               <p className="text-xs font-bold text-white">При получении в ПВЗ / Курьеру</p>
@@ -675,9 +669,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                 <button
                   onClick={handleInitiateCheckout}
-                  className="w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all"
+                  className="w-full bg-gradient-to-r from-emerald-600 via-green-600 to-lime-600 hover:from-emerald-500 hover:to-lime-500 text-slate-950 font-extrabold py-3 px-4 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all"
                 >
-                  <ShieldCheck className="w-5 h-5" />
+                  <ShieldCheck className="w-5 h-5 text-slate-950" />
                   <span>
                     {paymentMethod === 'stripe' ? 'Перейти к оплате Stripe' : 'Подтвердить и оформить'}
                   </span>
@@ -731,10 +725,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               </div>
               <div className="p-6 flex flex-col justify-between space-y-4">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">Партия: {viewingProduct.batchName}</span>
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Партия: {viewingProduct.batchName}</span>
                   <h3 className="text-lg font-bold text-white mt-1">{viewingProduct.product.name}</h3>
                   <p className="text-xs text-slate-400 mt-2">
-                    Вес товара: {viewingProduct.product.weight} кг. Официальная поставка с гарантией качества склада.
+                    Вес товара: {viewingProduct.product.weight} кг. Официальная поставка с гарантией качества Amperbike.kg.
                   </p>
                 </div>
 
@@ -747,7 +741,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-400">Оптовая цена (от 10 шт):</span>
-                    <span className="font-bold text-indigo-300">
+                    <span className="font-bold text-amber-400">
                       {Math.round(getProductPrice(viewingProduct.product) * 0.85).toLocaleString()} {displayCurrency === 'KGS' ? 'сом' : '$'}
                     </span>
                   </div>
@@ -763,9 +757,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     setViewingProduct(null);
                     setIsCartOpen(true);
                   }}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 text-xs"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold py-3 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 text-xs"
                 >
-                  <ShoppingCart className="w-4 h-4" />
+                  <ShoppingCart className="w-4 h-4 text-slate-950" />
                   <span>Добавить в корзину</span>
                 </button>
               </div>
@@ -777,9 +771,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       <footer className="bg-slate-950 border-t border-slate-900 py-8 px-4 sm:px-6 text-xs text-slate-500 mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left space-y-1">
-            <p className="font-bold text-slate-300">© 2026 SINO MARKETPLACE | Прямые поставки импорта</p>
+            <p className="font-bold text-slate-300">© 2026 Amperbike.kg | SINO MARKETPLACE</p>
             <p className="text-[11px] text-slate-500">
-              Гарантированное качество, онлайн-оплата карт Stripe, выдача по QR-коду в ПВЗ.
+              Гарантированное качество, электротранспорт, онлайн-оплата карт Stripe, выдача по QR-коду в ПВЗ.
             </p>
           </div>
 
@@ -792,7 +786,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               }}
               className="flex items-center gap-1.5 text-slate-600 hover:text-slate-400 text-[11px] py-1.5 px-3 rounded-lg border border-slate-900 hover:border-slate-800 transition-all"
             >
-              <Lock className="w-3 h-3 text-indigo-400" />
+              <Lock className="w-3 h-3 text-amber-400" />
               <span>Вход для сотрудников / владельца</span>
             </button>
           )}
@@ -811,7 +805,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             </button>
 
             <div className="flex flex-col items-center text-center mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mb-3">
                 <Lock className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-white">Вход в Панель Управления</h3>
@@ -842,7 +836,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   value={ownerPasswordInput}
                   onChange={(e) => setOwnerPasswordInput(e.target.value)}
                   placeholder="•••••"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-sm text-center font-mono text-white outline-none tracking-widest placeholder:tracking-normal"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-center font-mono text-white outline-none tracking-widest placeholder:tracking-normal"
                 />
               </div>
 
@@ -854,9 +848,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2"
               >
-                <ShieldCheck className="w-4 h-4" />
+                <ShieldCheck className="w-4 h-4 text-slate-950" />
                 <span>Войти на склад</span>
               </button>
 

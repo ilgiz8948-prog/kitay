@@ -1883,13 +1883,13 @@ export default function App() {
       {/* 1. HEADER */}
       <header className="h-16 border-b border-slate-800 bg-slate-900/75 backdrop-blur-md flex items-center justify-between px-4 sm:px-8 flex-shrink-0 sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/15">М</div>
+          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center font-extrabold text-slate-950 shadow-md shadow-emerald-500/20">A</div>
           <div>
-            <h1 className="text-base sm:text-lg font-semibold tracking-tight text-white flex items-center gap-1.5">
-              МАРКЕТ <span className="text-blue-500 font-normal">ПЛЕЙС</span>
+            <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-1.5">
+              Amperbike<span className="text-emerald-400 font-semibold">.kg</span>
             </h1>
-            <p className="text-[9px] text-slate-500 tracking-wider uppercase font-bold -mt-0.5 hidden sm:block">
-              Учет поставок из Китая • сом & $
+            <p className="text-[9px] text-emerald-400/80 tracking-wider uppercase font-extrabold -mt-0.5 hidden sm:block">
+              Склад и учет поставок • сом & $
             </p>
           </div>
         </div>
