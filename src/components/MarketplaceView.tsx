@@ -344,41 +344,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         </div>
       </section>
 
-      {/* BATCH / CATEGORY FILTERS */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-2 overflow-x-auto scrollbar-none border-b border-slate-900">
-        <span className="text-xs font-semibold text-slate-400 shrink-0 mr-1">Партии склада:</span>
-        <button
-          onClick={() => setSelectedBatchId('all')}
-          className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-            selectedBatchId === 'all'
-              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-          }`}
-        >
-          Все товары ({allCatalogProducts.length})
-        </button>
-        {batches.map((b) => (
-          <button
-            key={b.id}
-            onClick={() => setSelectedBatchId(b.id)}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
-              selectedBatchId === b.id
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            {b.name} ({b.products.length})
-          </button>
-        ))}
-      </div>
-
       {/* PRODUCT GRID */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full">
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16 bg-slate-900/40 rounded-3xl border border-dashed border-slate-800">
             <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
             <h3 className="text-base font-bold text-slate-300">Товары не найдены</h3>
-            <p className="text-xs text-slate-500 mt-1">Попробуйте изменить поисковый запрос или выбрать другую партию склада.</p>
+            <p className="text-xs text-slate-500 mt-1">Попробуйте изменить поисковый запрос.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -406,10 +378,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                         <span className="text-[11px]">Фото не загружено</span>
                       </div>
                     )}
-                    {/* Batch Tag */}
-                    <div className="absolute top-2.5 left-2.5 bg-slate-900/80 backdrop-blur-md text-slate-300 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-700">
-                      {batchName}
-                    </div>
                     {/* Stock Tag */}
                     <div className="absolute top-2.5 right-2.5">
                       {isAvailable ? (
@@ -724,7 +692,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 </div>
                 <div className="p-6 flex flex-col justify-between space-y-4">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Партия: {viewingProduct.batchName}</span>
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">В наличии в Бишкеке</span>
                     <h3 className="text-lg font-bold text-white mt-1">{viewingProduct.product.name}</h3>
                     <p className="text-xs text-slate-400 mt-2">
                       Вес товара: {viewingProduct.product.weight} кг. Официальная поставка с гарантией качества Amperbike.kg.
