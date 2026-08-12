@@ -327,6 +327,42 @@ export default function App() {
     initApp();
   }, []);
 
+  // --- ROUTING EFFECT FOR SEPARATE CLIENT MARKETPLACE AND OWNER WAREHOUSE URLS ---
+  useEffect(() => {
+    const checkRoute = () => {
+      const path = window.location.pathname.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+
+      const isWarehouseRoute = 
+        path.includes('/admin') || 
+        path.includes('/warehouse') || 
+        path.includes('/sklad') || 
+        search.includes('view=warehouse') || 
+        search.includes('mode=warehouse') || 
+        search.includes('view=admin') ||
+        hash.includes('warehouse') || 
+        hash.includes('admin') || 
+        hash.includes('sklad');
+
+      if (isWarehouseRoute) {
+        setShowMarketplaceView(false);
+      } else {
+        setShowMarketplaceView(true);
+      }
+    };
+
+    checkRoute();
+
+    window.addEventListener('popstate', checkRoute);
+    window.addEventListener('hashchange', checkRoute);
+
+    return () => {
+      window.removeEventListener('popstate', checkRoute);
+      window.removeEventListener('hashchange', checkRoute);
+    };
+  }, []);
+
   // Real-time multi-device Firestore synchronization
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -1790,10 +1826,6 @@ export default function App() {
         batches={batches}
         orders={orders}
         onPlaceOrder={handlePlaceOrder}
-        onOpenSellerDashboard={() => {
-          setIsAuthenticated(true);
-          setShowMarketplaceView(false);
-        }}
         notifications={notifications}
         onMarkNotificationRead={handleMarkNotificationRead}
         adminPasswordHash={settings.passwordHash}
@@ -1810,27 +1842,27 @@ export default function App() {
           <span>Облачная База: Активна</span>
         </div>
 
-        <div className="w-full max-w-md bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl shadow-blue-900/15 transition-all">
+        <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-emerald-950/80 rounded-3xl p-8 shadow-2xl shadow-emerald-950/40 transition-all">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-white text-2xl shadow-lg shadow-blue-500/25 mb-4">
-              М
+            <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center font-black text-slate-950 text-2xl shadow-lg shadow-emerald-500/20 mb-4">
+              A
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white mb-1">
-              МАРКЕТ <span className="text-blue-500 font-normal">ПЛЕЙС</span>
+            <h1 className="text-2xl font-black tracking-tight text-white mb-1">
+              БИЗНЕС СКЛАД <span className="text-emerald-400 font-bold text-sm block text-center mt-0.5">(Панель Владельца)</span>
             </h1>
-            <p className="text-slate-400 text-xs text-center px-4 leading-relaxed mt-1">
-              Учет и калькуляция товаров из Китая. Данные синхронизированы для ноутбука и телефона.
+            <p className="text-slate-400 text-xs text-center px-4 leading-relaxed mt-2">
+              Учет поставок, партий и калькуляция товаров из Китая для Amperbike.kg. Доступ только для владельца.
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Введите пароль для авторизации
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 text-center">
+                Введите пароль для входа на склад
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500">
-                  <Lock className="w-4 h-4" />
+                  <Lock className="w-4 h-4 text-emerald-400" />
                 </span>
                 <input
                   id="pwd-input"
@@ -1838,7 +1870,7 @@ export default function App() {
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
                   placeholder="•••••"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-900 rounded-xl outline-none text-white font-mono text-center tracking-widest placeholder:tracking-normal text-sm transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl outline-none text-white font-mono text-center tracking-widest placeholder:tracking-normal text-sm transition-all"
                   autoFocus
                 />
               </div>
@@ -1853,22 +1885,24 @@ export default function App() {
             <button
               id="submit-auth"
               type="submit"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 active:translate-y-[1px] text-white font-bold rounded-xl shadow-lg shadow-blue-600/15 transition-all text-xs tracking-wider uppercase"
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:translate-y-[1px] text-slate-950 font-extrabold rounded-xl shadow-lg shadow-emerald-600/25 transition-all text-xs tracking-wider uppercase"
             >
               Войти на склад
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-800/80 text-center">
+          <div className="mt-8 pt-6 border-t border-slate-800/80 text-center space-y-3">
             <button
-              onClick={() => setShowMarketplaceView(true)}
-              className="text-xs text-indigo-400 hover:text-indigo-300 underline font-medium"
+              onClick={() => {
+                setShowMarketplaceView(true);
+                window.location.hash = '';
+              }}
+              className="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold"
             >
-              ← Вернуться на сайт для клиентов
+              ← Перейти на Витрину Маркетплейс Amperbike (для клиентов)
             </button>
-            <div className="inline-block px-4 py-2.5 bg-slate-950/40 rounded-xl border border-slate-800/50 text-xs text-slate-400 leading-relaxed mt-4">
-              💡 Пароль по умолчанию: <span className="font-mono text-blue-400 font-bold">12345</span>
-              <p className="text-[9px] text-slate-500 mt-0.5">Данные сохраняются в облаке и будут доступны везде!</p>
+            <div className="inline-block px-4 py-2 bg-slate-950/60 rounded-xl border border-slate-800/80 text-xs text-slate-400 leading-relaxed w-full">
+              💡 Пароль владельца: <span className="font-mono text-emerald-400 font-bold">12345</span>
             </div>
           </div>
         </div>
@@ -1996,11 +2030,17 @@ export default function App() {
               <span>Аналитика</span>
             </button>
             <button
-              onClick={() => setShowMarketplaceView(true)}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-lg text-xs tracking-wide flex items-center gap-1.5 transition-all shadow-md"
+              onClick={() => {
+                setShowMarketplaceView(true);
+                if (window.location.hash === '#warehouse') {
+                  window.location.hash = '';
+                }
+              }}
+              className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-500 to-lime-500 hover:from-emerald-400 hover:to-lime-400 text-slate-950 font-extrabold rounded-lg text-xs tracking-wide flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20"
+              title="Открыть витрину маркетплейса для клиентов"
             >
-              <ShoppingBag className="w-3.5 h-3.5 text-white" />
-              <span>Витрина клиентам</span>
+              <ShoppingBag className="w-3.5 h-3.5 text-slate-950" />
+              <span>Витрина клиентов</span>
             </button>
             <button
               onClick={() => setShowSellerOrdersModal(true)}
