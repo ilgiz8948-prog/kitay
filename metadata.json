@@ -1,0 +1,8 @@
+{
+  "name": "БИЗНЕС СКЛАД",
+  "description": "A responsive calculator, inventory ledger, and debt manager for tracking goods ordered from China, supporting custom CNY exchange rates, landed costs, wholesale/retail pricing strategy, and debtor repayment tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
