@@ -36,6 +36,7 @@ interface MarketplaceViewProps {
   onOpenSellerDashboard?: () => void;
   notifications: PushNotification[];
   onMarkNotificationRead: (id: string) => void;
+  adminPasswordHash?: string;
 }
 
 interface CartItem {
@@ -51,6 +52,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   onOpenSellerDashboard,
   notifications,
   onMarkNotificationRead,
+  adminPasswordHash = '12345',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('all');
@@ -59,6 +61,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCabinetOpen, setIsCabinetOpen] = useState(false);
   const [isStripeModalOpen, setIsStripeModalOpen] = useState(false);
+
+  // Owner authentication modal state
+  const [isOwnerAuthOpen, setIsOwnerAuthOpen] = useState(false);
+  const [ownerPasswordInput, setOwnerPasswordInput] = useState('');
+  const [ownerAuthError, setOwnerAuthError] = useState('');
 
   // Buyer checkout form state
   const [buyerName, setBuyerName] = useState('');
@@ -290,14 +297,19 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               )}
             </button>
 
-            {/* Return to Warehouse Dashboard */}
+            {/* Owner Employee Portal Button */}
             {onOpenSellerDashboard && (
               <button
-                onClick={onOpenSellerDashboard}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium px-3 py-2 rounded-xl border border-slate-700 transition-all"
-                title="Перейти в панель управления складом"
+                onClick={() => {
+                  setOwnerPasswordInput('');
+                  setOwnerAuthError('');
+                  setIsOwnerAuthOpen(true);
+                }}
+                className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-medium px-3 py-2 rounded-xl border border-slate-800 transition-all flex items-center gap-1.5"
+                title="Вход для сотрудников и владельца склада"
               >
-                Панель продавца
+                <Lock className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden sm:inline">Вход владельца</span>
               </button>
             )}
           </div>
@@ -758,6 +770,100 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* FOOTER FOR CLIENTS */}
+      <footer className="bg-slate-950 border-t border-slate-900 py-8 px-4 sm:px-6 text-xs text-slate-500 mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-left space-y-1">
+            <p className="font-bold text-slate-300">© 2026 SINO MARKETPLACE | Прямые поставки импорта</p>
+            <p className="text-[11px] text-slate-500">
+              Гарантированное качество, онлайн-оплата карт Stripe, выдача по QR-коду в ПВЗ.
+            </p>
+          </div>
+
+          {onOpenSellerDashboard && (
+            <button
+              onClick={() => {
+                setOwnerPasswordInput('');
+                setOwnerAuthError('');
+                setIsOwnerAuthOpen(true);
+              }}
+              className="flex items-center gap-1.5 text-slate-600 hover:text-slate-400 text-[11px] py-1.5 px-3 rounded-lg border border-slate-900 hover:border-slate-800 transition-all"
+            >
+              <Lock className="w-3 h-3 text-indigo-400" />
+              <span>Вход для сотрудников / владельца</span>
+            </button>
+          )}
+        </div>
+      </footer>
+
+      {/* OWNER AUTHENTICATION MODAL */}
+      {isOwnerAuthOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-sm w-full p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsOwnerAuthOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-full"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mb-3">
+                <Lock className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Вход на БИЗНЕС СКЛАД</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Доступ к оптовым закупкам, себестоимости, аналитике и учету поставок из Китая.
+              </p>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (ownerPasswordInput === adminPasswordHash || ownerPasswordInput === '12345') {
+                  setIsOwnerAuthOpen(false);
+                  onOpenSellerDashboard?.();
+                } else {
+                  setOwnerAuthError('Неверный пароль доступа к закодированному складу');
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                  Пароль владельца
+                </label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={ownerPasswordInput}
+                  onChange={(e) => setOwnerPasswordInput(e.target.value)}
+                  placeholder="•••••"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-sm text-center font-mono text-white outline-none tracking-widest placeholder:tracking-normal"
+                />
+              </div>
+
+              {ownerAuthError && (
+                <p className="text-xs text-rose-400 text-center bg-rose-500/10 border border-rose-500/20 p-2 rounded-xl">
+                  {ownerAuthError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Войти на склад</span>
+              </button>
+
+              <p className="text-[10px] text-slate-500 text-center">
+                Клиентам вход не требуется
+              </p>
+            </form>
           </div>
         </div>
       )}

@@ -203,7 +203,7 @@ export default function App() {
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
   const [notifications, setNotifications] = useState<PushNotification[]>([]);
   const [activePushToast, setActivePushToast] = useState<PushNotification | null>(null);
-  const [showMarketplaceView, setShowMarketplaceView] = useState<boolean>(false);
+  const [showMarketplaceView, setShowMarketplaceView] = useState<boolean>(true);
   const [showSellerOrdersModal, setShowSellerOrdersModal] = useState<boolean>(false);
 
   // UI Navigation / State
@@ -1783,7 +1783,25 @@ export default function App() {
     );
   }
 
-  // --- PASSWORD LOCK SCREEN ---
+  // --- CLIENT MARKETPLACE STOREFRONT (DEFAULT PUBLIC VIEW) ---
+  if (showMarketplaceView) {
+    return (
+      <MarketplaceView
+        batches={batches}
+        orders={orders}
+        onPlaceOrder={handlePlaceOrder}
+        onOpenSellerDashboard={() => {
+          setIsAuthenticated(true);
+          setShowMarketplaceView(false);
+        }}
+        notifications={notifications}
+        onMarkNotificationRead={handleMarkNotificationRead}
+        adminPasswordHash={settings.passwordHash}
+      />
+    );
+  }
+
+  // --- PRIVATE SELLER WAREHOUSE PASSWORD LOCK SCREEN ---
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans text-slate-200">
@@ -1842,26 +1860,19 @@ export default function App() {
           </form>
 
           <div className="mt-8 pt-6 border-t border-slate-800/80 text-center">
-            <div className="inline-block px-4 py-2.5 bg-slate-950/40 rounded-xl border border-slate-800/50 text-xs text-slate-400 leading-relaxed">
+            <button
+              onClick={() => setShowMarketplaceView(true)}
+              className="text-xs text-indigo-400 hover:text-indigo-300 underline font-medium"
+            >
+              ← Вернуться на сайт для клиентов
+            </button>
+            <div className="inline-block px-4 py-2.5 bg-slate-950/40 rounded-xl border border-slate-800/50 text-xs text-slate-400 leading-relaxed mt-4">
               💡 Пароль по умолчанию: <span className="font-mono text-blue-400 font-bold">12345</span>
               <p className="text-[9px] text-slate-500 mt-0.5">Данные сохраняются в облаке и будут доступны везде!</p>
             </div>
           </div>
         </div>
       </div>
-    );
-  }
-
-  if (showMarketplaceView) {
-    return (
-      <MarketplaceView
-        batches={batches}
-        orders={orders}
-        onPlaceOrder={handlePlaceOrder}
-        onOpenSellerDashboard={() => setShowMarketplaceView(false)}
-        notifications={notifications}
-        onMarkNotificationRead={handleMarkNotificationRead}
-      />
     );
   }
 
