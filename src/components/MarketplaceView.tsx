@@ -23,7 +23,8 @@ import {
   Info,
   Phone,
   QrCode,
-  DollarSign
+  DollarSign,
+  Building2
 } from 'lucide-react';
 import { Product, ShipmentBatch, MarketplaceOrder, PushNotification, MarketplaceSettings } from '../types';
 import StripeCheckoutModal from './StripeCheckoutModal';
@@ -202,9 +203,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       paymentMethod,
       paymentStatus,
       stripeTransactionId: stripeTxId,
-      deliveryType,
-      deliveryAddress: deliveryType === 'courier' ? deliveryAddress : undefined,
-      pickupPointName: deliveryType === 'pickup_point' ? pickupPointName : undefined,
+      deliveryType: 'pickup_point',
+      deliveryAddress: undefined,
+      pickupPointName: marketplaceSettings?.pvzAddress || 'г. Бишкек, ул. Чуй 128 (ЦУМ)',
       status: 'new',
       statusHistory: [
         {
@@ -522,62 +523,28 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                     {/* Delivery mode */}
                     <div className="pt-2">
-                      <label className="block text-[11px] text-slate-400 mb-1">Способ получения</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setDeliveryType('pickup_point')}
-                          className={`p-2.5 rounded-lg border text-xs font-semibold text-center transition-all ${
-                            deliveryType === 'pickup_point'
-                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                              : 'bg-slate-950 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          Пункт выдачи (ПВЗ)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeliveryType('courier')}
-                          className={`p-2.5 rounded-lg border text-xs font-semibold text-center transition-all ${
-                            deliveryType === 'courier'
-                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                              : 'bg-slate-950 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          Курьер до двери
-                        </button>
+                      <label className="block text-[11px] text-slate-400 mb-1 font-semibold">Пункт выдачи заказа (ПВЗ)</label>
+                      <div className="bg-slate-950 p-3.5 rounded-xl border border-emerald-500/30 space-y-1.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-white">
+                          <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>{marketplaceSettings?.pvzAddress || 'г. Бишкек, ул. Чуй 128 (ЦУМ)'}</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 pl-6">
+                          <Clock className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span>{marketplaceSettings?.pvzWorkingHours || 'Работаем ежедневно 09:00 - 21:00'}</span>
+                        </div>
+                        {marketplaceSettings?.pvzPhone && (
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pl-6">
+                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{marketplaceSettings.pvzPhone}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {deliveryType === 'pickup_point' ? (
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Выберите ПВЗ</label>
-                        <select
-                          value={pickupPointName}
-                          onChange={(e) => setPickupPointName(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        >
-                          <option value="ПВЗ Бишкек - ул. Чуй 128 (ЦУМ)">ПВЗ Бишкек - ул. Чуй 128 (ЦУМ)</option>
-                          <option value="ПВЗ Бишкек - Рынок Дордой, проход 15">ПВЗ Бишкек - Рынок Дордой, проход 15</option>
-                          <option value="ПВЗ Алматы - пр. Достык 85">ПВЗ Алматы - пр. Достык 85</option>
-                        </select>
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Адрес доставки</label>
-                        <input
-                          type="text"
-                          value={deliveryAddress}
-                          onChange={(e) => setDeliveryAddress(e.target.value)}
-                          placeholder="г. Бишкек, ул. Киевская 42, кв 10"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
-                      </div>
-                    )}
-
                     {/* Payment Mode Selection */}
                     <div className="pt-2">
-                      <label className="block text-[11px] text-slate-400 mb-1">Способ оплаты</label>
+                      <label className="block text-[11px] text-slate-400 mb-1 font-semibold">Способ оплаты</label>
                       <div className="space-y-2">
                         <label className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer hover:border-emerald-500/50">
                           <div className="flex items-center gap-2.5">
@@ -610,7 +577,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                               className="accent-emerald-500"
                             />
                             <div>
-                              <p className="text-xs font-bold text-white">При получении в ПВЗ / Курьеру</p>
+                              <p className="text-xs font-bold text-white">При получении в ПВЗ</p>
                               <p className="text-[10px] text-slate-400">Наличными или картой на месте</p>
                             </div>
                           </div>
