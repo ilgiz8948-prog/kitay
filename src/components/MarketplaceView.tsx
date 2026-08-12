@@ -25,7 +25,7 @@ import {
   QrCode,
   DollarSign
 } from 'lucide-react';
-import { Product, ShipmentBatch, MarketplaceOrder, PushNotification } from '../types';
+import { Product, ShipmentBatch, MarketplaceOrder, PushNotification, MarketplaceSettings } from '../types';
 import StripeCheckoutModal from './StripeCheckoutModal';
 import BuyerCabinetModal from './BuyerCabinetModal';
 import { AmperbikeLogo } from './AmperbikeLogo';
@@ -38,6 +38,7 @@ interface MarketplaceViewProps {
   notifications: PushNotification[];
   onMarkNotificationRead: (id: string) => void;
   adminPasswordHash?: string;
+  marketplaceSettings?: MarketplaceSettings;
 }
 
 interface CartItem {
@@ -54,6 +55,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   notifications,
   onMarkNotificationRead,
   adminPasswordHash = '12345',
+  marketplaceSettings,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('all');
@@ -307,13 +309,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
           <div className="space-y-3 max-w-2xl text-center md:text-left">
             <div className="inline-flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 px-3.5 py-1 rounded-full text-xs font-bold text-emerald-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Amperbike.kg — Прямые импортные поставки
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> {marketplaceSettings?.storeName || 'Amperbike.kg'} — Прямые импортные поставки
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Электротранспорт и качественные товары в наличии в Бишкеке
+              {marketplaceSettings?.heroTitle || 'Электротранспорт и качественные товары в наличии в Бишкеке'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Официальный каталог Amperbike.kg с прямой гарантией склада. Безопасная онлайн-оплата карт Stripe, экспресс-выдача в ПВЗ по QR-коду и быстрая курьерская доставка.
+              {marketplaceSettings?.heroSubtitle || 'Официальный каталог Amperbike.kg с прямой гарантией склада. Безопасная онлайн-оплата карт Stripe, экспресс-выдача в ПВЗ по QR-коду и быстрая курьерская доставка.'}
             </p>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-1 text-xs text-slate-300">
               <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
@@ -334,10 +336,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             </div>
             <div className="text-xs">
               <p className="text-slate-400">Пункт выдачи Amperbike (ПВЗ):</p>
-              <p className="font-bold text-white text-sm">г. Бишкек, ул. Чуй 128 (ЦУМ)</p>
+              <p className="font-bold text-white text-sm">{marketplaceSettings?.pvzAddress || 'г. Бишкек, ул. Чуй 128 (ЦУМ)'}</p>
               <p className="text-emerald-400 text-[11px] font-semibold flex items-center gap-1 mt-0.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                Работаем ежедневно 09:00 - 21:00
+                {marketplaceSettings?.pvzWorkingHours || 'Работаем ежедневно 09:00 - 21:00'}
               </p>
             </div>
           </div>

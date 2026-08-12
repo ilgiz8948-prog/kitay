@@ -149,3 +149,12 @@ export interface PushNotification {
   orderId?: string;
 }
 
+export interface MarketplaceSettings {
+  pvzAddress: string;
+  pvzWorkingHours: string;
+  pvzPhone: string;
+  storeName: string;
+  heroTitle: string;
+  heroSubtitle: string;
+}
+

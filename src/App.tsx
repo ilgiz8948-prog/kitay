@@ -23,6 +23,7 @@ import {
   Wallet,
   CreditCard,
   ShoppingBag,
+  Store,
   Camera,
   Image as ImageIcon,
   X,
@@ -33,7 +34,7 @@ import {
   Bell
 } from 'lucide-react';
 
-import { Product, ShipmentBatch, AppSettings, DebtRecord, DebtPayment, SaleRecord, SaleItemRecord, MarketplaceOrder, OrderStatus, PushNotification } from './types';
+import { Product, ShipmentBatch, AppSettings, DebtRecord, DebtPayment, SaleRecord, SaleItemRecord, MarketplaceOrder, OrderStatus, PushNotification, MarketplaceSettings } from './types';
 import { 
   db, 
   saveBatchToCloud, 
@@ -64,6 +65,7 @@ import SalesAnalyticsModal from './components/SalesAnalyticsModal';
 import ReceiptModal from './components/ReceiptModal';
 import MarketplaceView from './components/MarketplaceView';
 import SellerOrdersManager from './components/SellerOrdersManager';
+import MarketplaceSettingsModal from './components/MarketplaceSettingsModal';
 
 
 // Helper to create a new empty batch
@@ -205,6 +207,28 @@ export default function App() {
   const [activePushToast, setActivePushToast] = useState<PushNotification | null>(null);
   const [showMarketplaceView, setShowMarketplaceView] = useState<boolean>(true);
   const [showSellerOrdersModal, setShowSellerOrdersModal] = useState<boolean>(false);
+  const [showMarketplaceSettingsModal, setShowMarketplaceSettingsModal] = useState<boolean>(false);
+
+  const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings>(() => {
+    const saved = localStorage.getItem('amperbike_mp_settings');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      pvzAddress: 'г. Бишкек, ул. Чуй 128 (ЦУМ)',
+      pvzWorkingHours: 'Работаем ежедневно 09:00 - 21:00',
+      pvzPhone: '+996 (555) 123-456',
+      storeName: 'Amperbike.kg',
+      heroTitle: 'Электротранспорт и качественные товары в наличии в Бишкеке',
+      heroSubtitle: 'Официальный каталог Amperbike.kg с прямой гарантией склада. Безопасная онлайн-оплата карт Stripe, экспресс-выдача в ПВЗ по QR-коду и быстрая курьерская доставка.',
+    };
+  });
+
+  const handleSaveMarketplaceSettings = (newSettings: MarketplaceSettings) => {
+    setMarketplaceSettings(newSettings);
+    localStorage.setItem('amperbike_mp_settings', JSON.stringify(newSettings));
+    saveSettingsToCloud({ ...settings, marketplaceSettings: newSettings } as any);
+  };
 
   // UI Navigation / State
   const [activeTab, setActiveTab] = useState<'calc' | 'shipments' | 'debts' | 'settings'>('calc');
@@ -1825,6 +1849,7 @@ export default function App() {
         notifications={notifications}
         onMarkNotificationRead={handleMarkNotificationRead}
         adminPasswordHash={settings.passwordHash}
+        marketplaceSettings={marketplaceSettings}
       />
     );
   }
@@ -1961,12 +1986,12 @@ export default function App() {
           {/* Desktop Nav tabs */}
           <nav className="hidden md:flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
-              onClick={handleManualSaveAll}
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs uppercase tracking-wide flex items-center gap-1.5 shadow-md shadow-emerald-950/40 transition-all active:scale-95 mr-1"
-              title="Сохранить все данные в памяти браузера и в облаке"
+              onClick={() => setShowMarketplaceSettingsModal(true)}
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs uppercase tracking-wide flex items-center gap-1.5 shadow-md shadow-indigo-950/40 transition-all mr-1"
+              title="Управление маркетплейсом, адреса ПВЗ и витрины"
             >
-              <Save className="w-3.5 h-3.5" />
-              <span>Сохранить</span>
+              <Store className="w-3.5 h-3.5" />
+              <span>Управление Маркетплейсом</span>
             </button>
             <button
               onClick={() => setShowSellProductModal(true)}
@@ -2089,12 +2114,12 @@ export default function App() {
             {syncStatus === 'error' && <span className="text-red-400">● Ошибка подключения</span>}
           </div>
           <button
-            onClick={() => { handleManualSaveAll(); setIsMobileMenuOpen(false); }}
-            className="w-full py-3 px-4 rounded-xl text-left text-sm font-bold flex items-center justify-between bg-emerald-600 text-white shadow-lg shadow-emerald-950/50"
+            onClick={() => { setShowMarketplaceSettingsModal(true); setIsMobileMenuOpen(false); }}
+            className="w-full py-3 px-4 rounded-xl text-left text-sm font-bold flex items-center justify-between bg-indigo-600 text-white shadow-lg"
           >
             <span className="flex items-center gap-2">
-              <Save className="w-4 h-4" />
-              <span>💾 Сохранить все изменения</span>
+              <Store className="w-4 h-4" />
+              <span>⚙️ Управление Маркетплейсом и ПВЗ</span>
             </span>
           </button>
           <button
@@ -3853,6 +3878,20 @@ export default function App() {
         onClose={() => setShowSellerOrdersModal(false)}
         orders={orders}
         onUpdateOrderStatus={handleUpdateOrderStatus}
+      />
+
+      {/* 10b. MARKETPLACE & PVZ SETTINGS MODAL */}
+      <MarketplaceSettingsModal
+        isOpen={showMarketplaceSettingsModal}
+        onClose={() => setShowMarketplaceSettingsModal(false)}
+        settings={marketplaceSettings}
+        onSave={handleSaveMarketplaceSettings}
+        onOpenMarketplace={() => {
+          setShowMarketplaceView(true);
+          if (window.location.hash === '#warehouse') {
+            window.location.hash = '';
+          }
+        }}
       />
 
       {/* 11. REAL-TIME PUSH NOTIFICATION TOAST BANNER */}
