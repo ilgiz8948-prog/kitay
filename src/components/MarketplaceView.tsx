@@ -814,7 +814,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mb-3">
                 <Lock className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white">Вход на БИЗНЕС СКЛАД</h3>
+              <h3 className="text-lg font-bold text-white">Вход в Панель Управления</h3>
               <p className="text-xs text-slate-400 mt-1">
                 Доступ к оптовым закупкам, себестоимости, аналитике и учету поставок из Китая.
               </p>
