@@ -81,10 +81,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
   // All products flattened from active warehouse batches
   const allCatalogProducts = useMemo(() => {
-    const list: { product: Product; batchName: string; batchId: string }[] = [];
+    const list: { product: Product; batchName: string; batchId: string; batch: ShipmentBatch }[] = [];
     batches.forEach((b) => {
       b.products.forEach((p) => {
-        list.push({ product: p, batchName: b.name, batchId: b.id });
+        list.push({ product: p, batchName: b.name, batchId: b.id, batch: b });
       });
     });
     return list;
@@ -134,20 +134,31 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
     );
   };
 
-  // Convert prices for display
-  const getProductPrice = (product: Product): number => {
+  // Convert prices for display using batch exchange rates
+  const getProductPrice = (product: Product, batch?: ShipmentBatch): number => {
+    const usdKgsRate = batch?.currencyRateUSDtoKGS || 88.0;
+    const cnyKgsRate = batch?.currencyRateCNYtoKGS || 13.2;
+    const cnyUsdRate = batch?.currencyRateCNYtoUSD || 0.15;
+
     if (displayCurrency === 'USD') {
-      return product.retailPriceUSD || Math.round((product.priceCNY * 0.15) * 1.5);
+      if (product.retailPriceUSD && product.retailPriceUSD > 0) {
+        return Math.round(product.retailPriceUSD);
+      }
+      return Math.round(product.priceCNY * cnyUsdRate * 1.5);
     } else {
-      // KGS: default conversion 1 USD ~ 88 KGS
-      const usd = product.retailPriceUSD || Math.round((product.priceCNY * 0.15) * 1.5);
-      return Math.round(usd * 88);
+      if (product.retailPriceUSD && product.retailPriceUSD > 0) {
+        return Math.round(product.retailPriceUSD * usdKgsRate);
+      }
+      return Math.round(product.priceCNY * cnyKgsRate * 1.5);
     }
   };
 
   const cartTotalAmount = useMemo(() => {
-    return cart.reduce((sum, item) => sum + getProductPrice(item.product) * item.quantity, 0);
-  }, [cart, displayCurrency]);
+    return cart.reduce((sum, item) => {
+      const parentBatch = batches.find((b) => b.name === item.batchName);
+      return sum + getProductPrice(item.product, parentBatch) * item.quantity;
+    }, 0);
+  }, [cart, displayCurrency, batches]);
 
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -371,8 +382,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.map(({ product, batchName }) => {
-              const displayPrice = getProductPrice(product);
+            {filteredProducts.map(({ product, batchName, batch }) => {
+              const displayPrice = getProductPrice(product, batch);
               const symbol = displayCurrency === 'KGS' ? 'сом' : '$';
               const isAvailable = product.quantity > 0;
 
@@ -689,68 +700,73 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       />
 
       {/* PRODUCT DETAIL MODAL */}
-      {viewingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl relative">
-            <button
-              onClick={() => setViewingProduct(null)}
-              className="absolute top-4 right-4 z-10 bg-slate-950/80 p-2 rounded-full text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      {viewingProduct && (() => {
+        const viewingBatch = batches.find(b => b.name === viewingProduct.batchName);
+        const itemPrice = getProductPrice(viewingProduct.product, viewingBatch);
 
-            <div className="grid grid-cols-1 sm:grid-cols-2">
-              <div className="aspect-square bg-slate-950 flex items-center justify-center">
-                {viewingProduct.product.imageUrl ? (
-                  <img src={viewingProduct.product.imageUrl} alt={viewingProduct.product.name} className="w-full h-full object-cover" />
-                ) : (
-                  <Package className="w-16 h-16 text-slate-700" />
-                )}
-              </div>
-              <div className="p-6 flex flex-col justify-between space-y-4">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Партия: {viewingProduct.batchName}</span>
-                  <h3 className="text-lg font-bold text-white mt-1">{viewingProduct.product.name}</h3>
-                  <p className="text-xs text-slate-400 mt-2">
-                    Вес товара: {viewingProduct.product.weight} кг. Официальная поставка с гарантией качества Amperbike.kg.
-                  </p>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl relative">
+              <button
+                onClick={() => setViewingProduct(null)}
+                className="absolute top-4 right-4 z-10 bg-slate-950/80 p-2 rounded-full text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2">
+                <div className="aspect-square bg-slate-950 flex items-center justify-center">
+                  {viewingProduct.product.imageUrl ? (
+                    <img src={viewingProduct.product.imageUrl} alt={viewingProduct.product.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Package className="w-16 h-16 text-slate-700" />
+                  )}
                 </div>
+                <div className="p-6 flex flex-col justify-between space-y-4">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Партия: {viewingProduct.batchName}</span>
+                    <h3 className="text-lg font-bold text-white mt-1">{viewingProduct.product.name}</h3>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Вес товара: {viewingProduct.product.weight} кг. Официальная поставка с гарантией качества Amperbike.kg.
+                    </p>
+                  </div>
 
-                <div className="space-y-2 border-t border-slate-800 pt-3">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400">Розничная цена:</span>
-                    <span className="font-extrabold text-emerald-400 text-sm">
-                      {getProductPrice(viewingProduct.product).toLocaleString()} {displayCurrency === 'KGS' ? 'сом' : '$'}
-                    </span>
+                  <div className="space-y-2 border-t border-slate-800 pt-3">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">Розничная цена:</span>
+                      <span className="font-extrabold text-emerald-400 text-sm">
+                        {itemPrice.toLocaleString()} {displayCurrency === 'KGS' ? 'сом' : '$'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">Оптовая цена (от 10 шт):</span>
+                      <span className="font-bold text-amber-400">
+                        {Math.round(itemPrice * 0.85).toLocaleString()} {displayCurrency === 'KGS' ? 'сом' : '$'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">Остаток на складе:</span>
+                      <span className="font-bold text-slate-200">{viewingProduct.product.quantity} шт</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400">Оптовая цена (от 10 шт):</span>
-                    <span className="font-bold text-amber-400">
-                      {Math.round(getProductPrice(viewingProduct.product) * 0.85).toLocaleString()} {displayCurrency === 'KGS' ? 'сом' : '$'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400">Остаток на складе:</span>
-                    <span className="font-bold text-slate-200">{viewingProduct.product.quantity} шт</span>
-                  </div>
+
+                  <button
+                    onClick={() => {
+                      addToCart(viewingProduct.product, viewingProduct.batchName);
+                      setViewingProduct(null);
+                      setIsCartOpen(true);
+                    }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold py-3 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 text-xs"
+                  >
+                    <ShoppingCart className="w-4 h-4 text-slate-950" />
+                    <span>Добавить в корзину</span>
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => {
-                    addToCart(viewingProduct.product, viewingProduct.batchName);
-                    setViewingProduct(null);
-                    setIsCartOpen(true);
-                  }}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold py-3 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 text-xs"
-                >
-                  <ShoppingCart className="w-4 h-4 text-slate-950" />
-                  <span>Добавить в корзину</span>
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {/* FOOTER FOR CLIENTS */}
       <footer className="bg-slate-950 border-t border-slate-900 py-8 px-4 sm:px-6 text-xs text-slate-500 mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">

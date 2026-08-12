@@ -314,10 +314,8 @@ export default function App() {
           console.warn('Cloud settings load timed out or failed, using local settings:', e);
         }
 
-        // 5. Load data if authenticated
-        if (sessionAuth === 'true') {
-          await loadAllData();
-        }
+        // 5. Load data for all users (clients marketplace and warehouse owner)
+        await loadAllData();
       } catch (err) {
         console.error('Failed to initialize:', err);
         setSyncStatus('error');
@@ -363,10 +361,8 @@ export default function App() {
     };
   }, []);
 
-  // Real-time multi-device Firestore synchronization
+  // Real-time multi-device Firestore synchronization for all users
   useEffect(() => {
-    if (!isAuthenticated) return;
-
     const unsubBatches = subscribeToBatchesFromCloud(
       (cloudBatches) => {
         if (cloudBatches && cloudBatches.length > 0) {
@@ -446,7 +442,7 @@ export default function App() {
       unsubOrders();
     };
 
-  }, [isAuthenticated]);
+  }, []);
 
   // Load batches and debts once authenticated
   const loadAllData = async () => {
